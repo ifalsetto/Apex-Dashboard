@@ -1,14 +1,20 @@
 __pycache__/
 *.pyc
+
 .venv/
 venv/
 .env
 .streamlit/secrets.toml
 *.log
+
+# App-generated / user data (DO NOT COMMIT)
+profile_autosave.json
+profile_index.json
+
+Profiles/
 Snapshots/
+Scans/
+Exports/
+StorageMap/
 TempBin/
 _TRASH_BIN/
-Exports/
-Scans/
-StorageMap/
-Profiles/
