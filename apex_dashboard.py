@@ -11,12 +11,17 @@ from typing import Dict, Any, Tuple, List, Optional
 
 import streamlit as st
 
-APP_VERSION = "v0.1.0-beta"
-REPO_ISSUES_URL = "https://github.com/ifalsetto/Apex-Dashboard/issues/new"
+# -------------------- App Identity --------------------
 APP_TITLE = "Apex Optimizer Dashboard"
+APP_VERSION = "v0.1.0-beta"
+
+REPO_URL = "https://github.com/ifalsetto/Apex-Dashboard"
+BUG_URL = f"{REPO_URL}/issues/new?template=bug_report.yml"
+FEATURE_URL = f"{REPO_URL}/issues/new?template=feature_request.yml"
+
 APEX_PROCESS_NAMES = ["r5apex", "r5apex.exe"]  # common Apex executable name
 
-# -------------------- Paths (Your Layout) --------------------
+# -------------------- Paths (Repo Layout) --------------------
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 SNAP_DIR = os.path.join(BASE_DIR, "Snapshots")
@@ -29,7 +34,7 @@ TEMPBIN_DIR = os.path.join(BASE_DIR, "TempBin")
 TODAY_STR = dt.date.today().strftime("%Y-%m-%d")
 DAILY_TEMP_DIR = os.path.join(TEMPBIN_DIR, TODAY_STR)
 
-# Trash Bin: "office cleanup" staging area (move-to-bin first, delete only when you confirm)
+# Trash Bin: "move-first, delete-last"
 TRASHBIN_DIR = os.path.join(BASE_DIR, "_TRASH_BIN")
 TRASH_TODAY_DIR = os.path.join(TRASHBIN_DIR, TODAY_STR)
 
@@ -44,16 +49,16 @@ AUTOSAVE_PATH = os.path.join(BASE_DIR, "profile_autosave.json")
 for p in [SNAP_DIR, SCAN_DIR, EXPORT_DIR, PROFILES_DIR, DAILY_TEMP_DIR, TRASH_TODAY_DIR, STORAGE_DIR]:
     os.makedirs(p, exist_ok=True)
 
-# -------------------- Defaults --------------------
-DEFAULT_PROFILE: Dict[str, Any] = {}
-    "meta": {}
-       "profileName": "Apex - Competitive (Generic)",
+# -------------------- Defaults (PUBLIC-SAFE) --------------------
+DEFAULT_PROFILE: Dict[str, Any] = {
+    "meta": {
+        "profileName": "Apex - Competitive (Generic)",
         "lastUpdatedISO": dt.datetime.now().isoformat(timespec="seconds"),
         "monitor": "Unknown / User provided",
-"gpu": "Unknown / User provided",
-"os": platform.platform(),
-"notes": "BETA: Fill this in on your device. Defaults are generic.",
-
+        "gpu": "Unknown / User provided",
+        "os": platform.system(),
+        "notes": "Public-safe defaults. Tune per user + log sessions.",
+    },
     "targets": {"refreshHz": 240, "fpsTarget": 237, "latencyGoalMs": 10},
     "toggles": {
         "hdrWindowsOn": True,
@@ -65,21 +70,21 @@ DEFAULT_PROFILE: Dict[str, Any] = {}
     },
     "launchOptions": [
         {"key": "-novid", "enabled": True, "note": "Skip intro videos"},
-        {"key": "-dev", "enabled": True, "note": "Skip more startup animations (varies by patch)"},
-        {"key": "+fps_max 0", "enabled": True, "note": "Uncap FPS (cap elsewhere if desired)"},
+        {"key": "-dev", "enabled": True, "note": "Skip some startup behavior (patch dependent)"},
+        {"key": "+fps_max 0", "enabled": True, "note": "Uncap engine FPS (cap elsewhere if desired)"},
         {"key": "+lobby_max_fps 0", "enabled": True, "note": "Uncap lobby/menu FPS"},
         {"key": "-no_render_on_input_thread", "enabled": True, "note": "Threading behavior (system/patch dependent)"},
         {"key": "+m_rawinput 1", "enabled": True, "note": "Raw mouse input"},
-        {"key": "-refresh 240", "enabled": False, "note": "Force 240Hz at launch (only if needed)"},
+        {"key": "-refresh 240", "enabled": False, "note": "Force refresh at launch (only if needed)"},
         {"key": "+mat_no_stretching 1", "enabled": True, "note": "Prevent stretching on aspect changes"},
         {"key": "+clip_mouse_to_letterbox 0", "enabled": True, "note": "Cursor behavior with letterbox"},
     ],
     "hdrSetup": {
         "windows": [
             "Settings → System → Display → Use HDR = ON",
-            "Auto HDR = ON (tune per-title via Win+G)",
-            "SDR brightness (in HDR) ≈ 35–40% for desktop readability",
-            "Run Windows HDR Calibration and save profile",
+            "Auto HDR = ON (tune per-title via Win+G if available)",
+            "SDR brightness (in HDR) start ≈ 35–40% for desktop readability",
+            "Run Windows HDR Calibration and save the profile",
         ],
         "nvidia": [
             "NVIDIA Control Panel → Change Resolution: RGB, Full, 10 bpc (if available)",
@@ -87,14 +92,14 @@ DEFAULT_PROFILE: Dict[str, Any] = {}
             "Avoid heavy filters; prioritize clarity",
         ],
         "monitor": [
-            "Use DisplayPort",
-            "DSC = ON/Auto (needed for 240Hz + HDR bandwidth)",
+            "Use DisplayPort when possible",
+            "DSC = ON/Auto if required for high Hz + HDR bandwidth",
             "OLED care features = ON",
-            "Disable extra dynamic contrast modes; keep tone mapping consistent",
+            "Disable extra dynamic contrast; keep tone mapping consistent",
         ],
         "apexBehavior": [
             "Apex has no native HDR toggle; Windows HDR/Auto HDR affects tone mapping",
-            "Use Win+G → HDR intensity until no gray fog but shadows still separate",
+            "Use Win+G HDR intensity until shadows separate without gray haze",
         ],
     },
     "presets": {
@@ -282,8 +287,6 @@ def settings_signature(profile: Dict[str, Any]) -> str:
 
 # -------------------- Windows helpers (PowerShell) --------------------
 def ps_run(cmd: str) -> str:
-    if not is_windows():
-        return ""
     try:
         out = subprocess.check_output(
             ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", cmd],
@@ -295,8 +298,6 @@ def ps_run(cmd: str) -> str:
         return ""
 
 def apex_process_running() -> bool:
-    if not is_windows():
-        return False
     check = r"""
 $names = @('r5apex','r5apex.exe')
 $found = $false
@@ -354,45 +355,20 @@ try { $p = Get-Process -Name r5apex -ErrorAction Stop; "{0}" -f $p.CPU } catch {
         return max(0.0, min(100.0, pct))
     except Exception:
         return 0.0
-        
-def is_windows() -> bool:
-    return platform.system().lower().startswith("win")
 
 def ping_sample(host: str = "1.1.1.1", count: int = 10) -> Tuple[Optional[int], Optional[float]]:
     try:
-        if is_windows():
-            cmd = ["ping", "-n", str(count), host]
-        else:
-            cmd = ["ping", "-c", str(count), host]
-
-        out = subprocess.check_output(cmd, text=True, errors="ignore")
+        out = subprocess.check_output(["ping", "-n", str(count), host], text=True, errors="ignore")
     except Exception:
         return None, None
-
     loss = None
-    # Windows: Lost = X (Y% loss)
     m = re.search(r"Lost = \d+ \((\d+)% loss\)", out, re.IGNORECASE)
     if m:
         loss = float(m.group(1))
-
-    # Linux/mac: X% packet loss
-    if loss is None:
-        m = re.search(r"(\d+(?:\.\d+)?)%\s*packet loss", out, re.IGNORECASE)
-        if m:
-            loss = float(m.group(1))
-
     avg = None
-    # Windows: Average = 12ms
     m2 = re.search(r"Average = (\d+)ms", out, re.IGNORECASE)
     if m2:
         avg = int(m2.group(1))
-
-    # Linux/mac: rtt min/avg/max/mdev = 10.0/12.0/...
-    if avg is None:
-        m3 = re.search(r"=\s*[\d\.]+/([\d\.]+)/", out)
-        if m3:
-            avg = int(float(m3.group(1)))
-
     return avg, loss
 
 # -------------------- Match Monitor (heuristic) --------------------
@@ -541,6 +517,7 @@ def auto_write_notes(profile: Dict[str, Any], last_entry: Dict[str, Any], compar
 
     lines = []
     lines.append("=== CURRENT COMP SETUP ===")
+    lines.append(f"Version: {APP_VERSION}")
     lines.append(f"Refresh/FPS cap: {int(targets.get('refreshHz',0))}Hz / {int(targets.get('fpsTarget',0))} FPS")
     lines.append(f"VRR: {'ON' if t.get('gsyncOn') else 'OFF'} | V-Sync (in-game): {'OFF' if t.get('vsyncInGameOff') else 'ON'} | Reflex: {'ON+Boost' if t.get('reflexBoostOn') else 'OFF'}")
     lines.append(f"HDR path: {hdr_label}")
@@ -574,16 +551,12 @@ def list_files_recursive(root: str) -> List[str]:
     return out
 
 def safe_move_to_trash(path: str) -> Tuple[bool, str]:
-    """
-    Moves a file into today's trash folder. Never deletes here.
-    """
     try:
         if not os.path.exists(path) or not os.path.isfile(path):
             return False, "Not a file."
         os.makedirs(TRASH_TODAY_DIR, exist_ok=True)
         name = os.path.basename(path)
         dst = os.path.join(TRASH_TODAY_DIR, name)
-        # Avoid overwriting
         if os.path.exists(dst):
             stem, ext = os.path.splitext(name)
             dst = os.path.join(TRASH_TODAY_DIR, f"{stem}_{dt.datetime.now().strftime('%H%M%S')}{ext}")
@@ -593,9 +566,6 @@ def safe_move_to_trash(path: str) -> Tuple[bool, str]:
         return False, str(e)
 
 def safe_empty_trash_today() -> Tuple[int, int]:
-    """
-    Deletes ONLY files inside today's trash folder.
-    """
     files_deleted = 0
     dirs_deleted = 0
     if not os.path.abspath(TRASH_TODAY_DIR).startswith(os.path.abspath(TRASHBIN_DIR)):
@@ -637,9 +607,6 @@ SAFE_SCAN_PRESETS = [
 ]
 
 def dir_stats(root: str, max_files: int = 25000) -> Dict[str, Any]:
-    """
-    Returns counts/sizes for a directory without reading file contents.
-    """
     total_files = 0
     total_bytes = 0
     type_counts: Dict[str, int] = {}
@@ -698,22 +665,21 @@ def write_storage_map(results: List[Dict[str, Any]]):
     }
     safe_save_json(STORAGE_MAP_JSON, doc)
 
-    # Flat CSV view
     rows = []
     for r in results:
         rows.append({
-            "label": r.get("label",""),
-            "path": r.get("path",""),
-            "exists": r.get("exists",""),
-            "files": r.get("total_files",""),
-            "size_bytes": r.get("total_bytes",""),
-            "size_human": bytes_human(int(r.get("total_bytes",0) or 0)),
-            "newest_modifiedISO": r.get("newest_modifiedISO",""),
-            "oldest_modifiedISO": r.get("oldest_modifiedISO",""),
-            "truncated": r.get("truncated",""),
+            "label": r.get("label", ""),
+            "path": r.get("path", ""),
+            "exists": r.get("exists", ""),
+            "files": r.get("total_files", ""),
+            "size_bytes": r.get("total_bytes", ""),
+            "size_human": bytes_human(int(r.get("total_bytes", 0) or 0)),
+            "newest_modifiedISO": r.get("newest_modifiedISO", ""),
+            "oldest_modifiedISO": r.get("oldest_modifiedISO", ""),
+            "truncated": r.get("truncated", ""),
         })
     with open(STORAGE_MAP_CSV, "w", newline="", encoding="utf-8") as f:
-        w = csv.DictWriter(f, fieldnames=list(rows[0].keys()) if rows else ["label","path"])
+        w = csv.DictWriter(f, fieldnames=list(rows[0].keys()) if rows else ["label", "path"])
         w.writeheader()
         for row in rows:
             w.writerow(row)
@@ -729,10 +695,6 @@ def ocr_available() -> Tuple[bool, str]:
         return False, str(e)
 
 def ocr_detect_end_screen_demo() -> Dict[str, Any]:
-    """
-    Safe demo: captures a full monitor image via mss and runs OCR.
-    This is OFF by default and only runs when user clicks.
-    """
     import pytesseract
     import mss
     from PIL import Image
@@ -750,12 +712,6 @@ def ocr_detect_end_screen_demo() -> Dict[str, Any]:
 
 # -------------------- PresentMon CSV import (safe) --------------------
 def parse_presentmon_csv(file_bytes: bytes) -> Dict[str, Any]:
-    """
-    Accepts a PresentMon CSV and computes Avg FPS and 1% low FPS if possible.
-    PresentMon formats vary; we handle common columns:
-      - "MsBetweenPresents" (frame time ms)
-      - or "FPS" per-row
-    """
     text = file_bytes.decode("utf-8-sig", errors="ignore")
     lines = text.splitlines()
     if len(lines) < 2:
@@ -766,20 +722,17 @@ def parse_presentmon_csv(file_bytes: bytes) -> Dict[str, Any]:
     ft_ms: List[float] = []
 
     for row in reader:
-        # Common: MsBetweenPresents
         if "MsBetweenPresents" in row and row["MsBetweenPresents"]:
             try:
                 ft_ms.append(float(row["MsBetweenPresents"]))
             except Exception:
                 pass
-        # Alternate: FPS
         if "FPS" in row and row["FPS"]:
             try:
                 fps_samples.append(float(row["FPS"]))
             except Exception:
                 pass
 
-    # Derive FPS from frame times if needed
     if not fps_samples and ft_ms:
         for ms in ft_ms:
             if ms > 0:
@@ -787,10 +740,9 @@ def parse_presentmon_csv(file_bytes: bytes) -> Dict[str, Any]:
 
     if not fps_samples:
         return {"ok": False, "error": "No usable FPS data found in CSV (expected FPS or MsBetweenPresents)."}
-    fps_samples.sort()
 
+    fps_samples.sort()
     avg_fps = sum(fps_samples) / len(fps_samples)
-    # 1% low = 1st percentile of FPS samples
     idx = max(0, int(len(fps_samples) * 0.01) - 1)
     one_percent_low = fps_samples[idx]
 
@@ -804,19 +756,15 @@ def parse_presentmon_csv(file_bytes: bytes) -> Dict[str, Any]:
 # -------------------- Streamlit Setup --------------------
 st.set_page_config(page_title=APP_TITLE, layout="wide")
 
-APP_VERSION = "v0.1.0-beta"
-BUG_URL = "https://github.com/ifalsetto/Apex-Dashboard/issues/new?template=bug_report.yml"
-
+# Sidebar: Beta ops + intake links (safe)
 with st.sidebar:
+    st.markdown("### Apex Dashboard")
     st.caption(f"Version: {APP_VERSION}")
-    st.link_button("Report a bug", BUG_URL)
-
-with st.sidebar:
-    st.markdown(f"### {APP_TITLE}")
-    st.caption(f"Version: {APP_VERSION}")
-    st.markdown(f"[Report a bug]({REPO_ISSUES_URL})")
-    st.caption("Include: steps + expected vs actual + screenshot if possible.")
-
+    st.link_button("Report a bug", BUG_URL, use_container_width=True)
+    st.link_button("Request a feature", FEATURE_URL, use_container_width=True)
+    st.markdown("---")
+    st.markdown("**Repo**")
+    st.markdown(f"[Apex-Dashboard]({REPO_URL})")
 
 if "profile" not in st.session_state:
     loaded = safe_load_json(AUTOSAVE_PATH)
@@ -851,8 +799,8 @@ profile: Dict[str, Any] = st.session_state.profile
 # -------------------- Header --------------------
 st.title(APP_TITLE)
 st.caption(
-    f"Profile: {profile['meta']['profileName']} • Monitor: {profile['meta']['monitor']} • "
-    f"GPU: {profile['meta']['gpu']} • Updated: {profile['meta']['lastUpdatedISO']}"
+    f"Version: {APP_VERSION} • Profile: {profile['meta']['profileName']} • "
+    f"Monitor: {profile['meta']['monitor']} • GPU: {profile['meta']['gpu']} • Updated: {profile['meta']['lastUpdatedISO']}"
 )
 
 h1, h2, h3, h4, h5 = st.columns([2, 1, 1, 1, 1])
@@ -873,16 +821,12 @@ with h3:
         st.rerun()
 
 with h4:
-    # Privacy-safe export option
     sanitize = bool(profile.get("privacy", {}).get("sanitize_exports", True))
 
     def sanitized_profile_copy(p: Dict[str, Any]) -> Dict[str, Any]:
         out = deep_copy(p)
-        # remove/neutralize anything that looks like user-specific paths
-        # (we do not store much, but this keeps it safe for public sharing)
         out.setdefault("meta", {})
         out["meta"]["notes"] = "(notes will be generated per user)"
-        # Any future fields that could contain paths/machine info should be stripped here.
         return out
 
     export_obj = sanitized_profile_copy(profile) if sanitize else profile
@@ -990,10 +934,6 @@ with tab_apex:
 # -------------------- Match Monitor Tab --------------------
 with tab_match:
     st.subheader("Match Monitor (Auto-detect start/end — safe heuristic)")
-    if not is_windows():
-    st.warning("Match Monitor is Windows-only (uses PowerShell + foreground window checks). Disabled on Streamlit Cloud.")
-    st.stop()
-    
     st.caption(
         "Safe mode: no injection, no memory reads. Uses Apex process + foreground window + timing streaks. "
         "End events are approximate."
@@ -1179,7 +1119,7 @@ with tab_scan:
                 name = gpu0.get("Name")
                 rr = gpu0.get("CurrentRefreshRate")
                 if name:
-                    profile["meta"]["gpu"] = name
+                    profile["meta"]["gpu"] = str(name)
                 if rr is not None:
                     try:
                         profile["targets"]["refreshHz"] = int(rr)
@@ -1212,9 +1152,9 @@ with tab_storage:
         with c1:
             plan[i]["enabled"] = st.checkbox("Scan", value=bool(item.get("enabled", True)), key=f"scan_en_{i}")
         with c2:
-            plan[i]["label"] = st.text_input("Label", value=item.get("label",""), key=f"scan_label_{i}")
+            plan[i]["label"] = st.text_input("Label", value=item.get("label", ""), key=f"scan_label_{i}")
         with c3:
-            plan[i]["path"] = st.text_input("Path", value=item.get("path",""), key=f"scan_path_{i}")
+            plan[i]["path"] = st.text_input("Path", value=item.get("path", ""), key=f"scan_path_{i}")
 
     st.session_state.scan_plan = plan
 
@@ -1228,8 +1168,8 @@ with tab_storage:
         for it in plan:
             if not it.get("enabled"):
                 continue
-            path = it.get("path","").strip()
-            label = it.get("label","").strip() or path
+            path = it.get("path", "").strip()
+            label = it.get("label", "").strip() or path
             if not path:
                 continue
             r = dir_stats(path, max_files=int(max_files))
@@ -1238,7 +1178,6 @@ with tab_storage:
 
         write_storage_map(results)
         st.session_state.storage_map = safe_load_json(STORAGE_MAP_JSON) or {}
-        # store the map build artifact in TempBin (safe to trash later)
         safe_save_json(os.path.join(DAILY_TEMP_DIR, f"storage_map_build_{dt.datetime.now().strftime('%H%M%S')}.json"), st.session_state.storage_map)
         st.success("Storage map updated.")
 
@@ -1246,18 +1185,18 @@ with tab_storage:
     st.markdown("### Current Storage Map (latest)")
     current = st.session_state.storage_map or safe_load_json(STORAGE_MAP_JSON) or {}
     if current and "results" in current:
-        st.caption(f"Created: {current.get('createdISO','')}")
+        st.caption(f"Created: {current.get('createdISO', '')}")
         flat = []
         for r in current.get("results", []):
             flat.append({
-                "label": r.get("label",""),
-                "path": r.get("path",""),
-                "exists": r.get("exists",""),
-                "files": r.get("total_files",""),
-                "size": bytes_human(int(r.get("total_bytes",0) or 0)),
-                "newest": r.get("newest_modifiedISO",""),
-                "oldest": r.get("oldest_modifiedISO",""),
-                "truncated": r.get("truncated",""),
+                "label": r.get("label", ""),
+                "path": r.get("path", ""),
+                "exists": r.get("exists", ""),
+                "files": r.get("total_files", ""),
+                "size": bytes_human(int(r.get("total_bytes", 0) or 0)),
+                "newest": r.get("newest_modifiedISO", ""),
+                "oldest": r.get("oldest_modifiedISO", ""),
+                "truncated": r.get("truncated", ""),
             })
         st.dataframe(flat, use_container_width=True, hide_index=True)
 
@@ -1268,7 +1207,7 @@ with tab_storage:
 
         with st.expander("File type breakdown"):
             for r in current.get("results", []):
-                st.markdown(f"**{r.get('label','')}**")
+                st.markdown(f"**{r.get('label', '')}**")
                 tc = r.get("type_counts", {})
                 if tc:
                     st.json(tc)
@@ -1303,7 +1242,6 @@ with tab_trash:
                 if ok:
                     moved += 1
             st.success(f"Moved {moved} files to Trash Bin.")
-
     with colB:
         st.write("")
 
@@ -1342,13 +1280,12 @@ with tab_ocr:
         st.caption(f"Missing/issue: {msg}")
     else:
         st.success("OCR dependencies detected.")
-        st.caption("This is a safe demo tool (screen capture + OCR). It does not inject into Apex.")
+        st.caption("Safe demo tool (screen capture + OCR). No injection into Apex.")
         if st.button("Run OCR scan NOW (1 capture)", use_container_width=True):
             try:
                 res = ocr_detect_end_screen_demo()
                 st.write("Detected keyword hits:", res.get("hits", []))
-                st.text_area("OCR preview (upper)", res.get("text_preview",""), height=220)
-                # save artifact to TempBin
+                st.text_area("OCR preview (upper)", res.get("text_preview", ""), height=220)
                 safe_save_json(os.path.join(DAILY_TEMP_DIR, f"ocr_capture_{dt.datetime.now().strftime('%H%M%S')}.json"), res)
             except Exception as e:
                 st.error(f"OCR scan failed: {e}")
@@ -1357,8 +1294,8 @@ with tab_ocr:
 with tab_presentmon:
     st.subheader("PresentMon FPS Import (optional)")
     st.caption(
-        "This does NOT run PresentMon. It imports a PresentMon CSV you already captured, "
-        "computes Avg FPS + 1% Low, and lets you apply it to the latest match log."
+        "Imports a PresentMon CSV you already captured, computes Avg FPS + 1% Low, "
+        "and lets you apply it to the latest match log."
     )
     upcsv = st.file_uploader("Upload PresentMon CSV", type=["csv"])
     if upcsv:
@@ -1372,7 +1309,6 @@ with tab_presentmon:
                 else:
                     logs[0]["avg_fps"] = result["avg_fps"]
                     logs[0]["one_percent_low"] = result["one_percent_low"]
-                    # refresh compare + notes
                     sig = logs[0].get("settings_signature", settings_signature(profile))
                     hdr_mode = logs[0].get("hdr_mode", hdr_method_label(profile.get("toggles", {})))
                     similar = find_similar_entries(logs[1:], sig, hdr_mode)
