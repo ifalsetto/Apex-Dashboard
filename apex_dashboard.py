@@ -47,13 +47,13 @@ for p in [SNAP_DIR, SCAN_DIR, EXPORT_DIR, PROFILES_DIR, DAILY_TEMP_DIR, TRASH_TO
 # -------------------- Defaults --------------------
 DEFAULT_PROFILE: Dict[str, Any] = {
     "meta": {
-        "profileName": "Apex - Competitive",
+       "profileName": "Apex - Competitive (Generic)",
         "lastUpdatedISO": dt.datetime.now().isoformat(timespec="seconds"),
-        "monitor": "ASUS ROG XG27AQDMG OLED 240Hz",
-        "gpu": "RTX 5070 Ti",
-        "os": "Windows 11",
-        "notes": "OLED + 240Hz. Focus: clarity + low latency + repeatable presets.",
-    },
+        "monitor": "Unknown / User provided",
+"gpu": "Unknown / User provided",
+"os": platform.platform(),
+"notes": "BETA: Fill this in on your device. Defaults are generic.",
+
     "targets": {"refreshHz": 240, "fpsTarget": 237, "latencyGoalMs": 10},
     "toggles": {
         "hdrWindowsOn": True,
