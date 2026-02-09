@@ -1,0 +1,88 @@
+{
+  "meta": {
+    "profileName": "Apex - Competitive",
+    "lastUpdatedISO": "2026-02-09T04:58:24",
+    "monitor": "ASUS ROG XG27AQDMG OLED 240Hz",
+    "gpu": "RTX 5070 Ti",
+    "os": "Windows 11",
+    "notes": "OLED + 240Hz. Clarity + low latency."
+  },
+  "targets": {
+    "refreshHz": 240,
+    "fpsTarget": 240,
+    "latencyGoalMs": 1
+  },
+  "launchOptions": [
+    {
+      "key": "-novid",
+      "enabled": true,
+      "note": "Skip intro videos"
+    },
+    {
+      "key": "-dev",
+      "enabled": true,
+      "note": "Skip startup animations"
+    },
+    {
+      "key": "+fps_max 0",
+      "enabled": false,
+      "note": "Uncap FPS"
+    },
+    {
+      "key": "+lobby_max_fps 0",
+      "enabled": true,
+      "note": "Uncap lobby FPS"
+    },
+    {
+      "key": "-no_render_on_input_thread",
+      "enabled": true,
+      "note": "Threading stability"
+    },
+    {
+      "key": "+m_rawinput 1",
+      "enabled": true,
+      "note": "Raw mouse input"
+    }
+  ],
+  "presets": {
+    "HDR ON (Auto HDR)": {
+      "Windows": {
+        "HDR": "ON",
+        "Auto HDR": "ON",
+        "SDR brightness in HDR": "35\u201340%"
+      },
+      "NVIDIA": {
+        "RTX HDR": "OFF",
+        "RGB Range": "Full",
+        "G-SYNC": "ON",
+        "V-Sync Global": "OFF"
+      },
+      "Apex": {
+        "V-Sync": "OFF",
+        "Reflex": "ON+Boost",
+        "AA": "OFF",
+        "AO": "OFF",
+        "Shadows": "LOW/OFF"
+      }
+    },
+    "HDR OFF (SDR)": {
+      "Windows": {
+        "HDR": "OFF",
+        "Auto HDR": "OFF"
+      },
+      "NVIDIA": {
+        "RTX HDR": "OFF",
+        "RGB Range": "Full",
+        "G-SYNC": "ON",
+        "V-Sync Global": "OFF"
+      },
+      "Apex": {
+        "V-Sync": "OFF",
+        "Reflex": "ON+Boost",
+        "AA": "OFF",
+        "AO": "OFF",
+        "Shadows": "LOW/OFF"
+      }
+    }
+  }
+}

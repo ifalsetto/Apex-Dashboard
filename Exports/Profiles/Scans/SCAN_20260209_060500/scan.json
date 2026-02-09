@@ -1,0 +1,80 @@
+﻿{
+    "scan":  {
+                 "createdISO":  "2026-02-09T06:05:01.8215260-06:00",
+                 "outputFolder":  "C:\\Users\\andre\\Apex  Dashboard\\Exports\\Profiles\\Scans\\SCAN_20260209_060500",
+                 "username":  "andre"
+             },
+    "system":  {
+                   "computer":  "FALSEGAMINGDESK",
+                   "manufacturer":  "CyberPowerPC",
+                   "model":  "GamingPC",
+                   "os":  {
+                              "caption":  "Microsoft Windows 11 Home",
+                              "version":  "10.0.26200",
+                              "build":  "26200"
+                          },
+                   "cpu":  {
+                               "name":  "AMD Ryzen 7 9800X3D 8-Core Processor           ",
+                               "cores":  8,
+                               "logicalProcessors":  16,
+                               "maxClockMHz":  4700
+                           },
+                   "gpus":  {
+                                "Name":  "NVIDIA GeForce RTX 5070 Ti",
+                                "DriverVersion":  "32.0.15.9186",
+                                "DriverDate":  "\/Date(1768867200000)\/",
+                                "VideoProcessor":  "NVIDIA GeForce RTX 5070 Ti",
+                                "AdapterRAM":  4293918720,
+                                "CurrentHorizontalResolution":  2560,
+                                "CurrentVerticalResolution":  1440,
+                                "CurrentRefreshRate":  239
+                            },
+                   "ramGB":  31.56
+               },
+    "apex":  {
+                 "configFilesCopiedTo":  "C:\\Users\\andre\\Apex  Dashboard\\Exports\\Profiles\\Scans\\SCAN_20260209_060500\\ApexConfigs",
+                 "configFilesFound":  [
+                                          "C:\\Users\\andre\\Saved Games\\Respawn\\Apex\\local\\videoconfig.txt",
+                                          "C:\\Users\\andre\\Saved Games\\Respawn\\Apex\\local\\settings.cfg"
+                                      ],
+                 "note":  "These are raw config files copied for inspection/import. No changes were made."
+             },
+    "registry_dump":  {
+                          "note":  "Raw registry values only. Meanings vary by Windows build; dashboard can interpret later.",
+                          "paths":  {
+                                        "HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\VideoSettings":  {
+                                                                                                                   "EnableAutoEnhanceDuringPlayback":  1,
+                                                                                                                   "DisableHDROnBattery":  0
+                                                                                                               },
+                                        "HKCU:\\Software\\Microsoft\\DirectX":  {
+
+                                                                                },
+                                        "HKCU:\\Software\\Microsoft\\GameBar":  {
+                                                                                    "GamepadDoublePressIntervalMs":  1,
+                                                                                    "UseNexusForGameBarEnabled":  0,
+                                                                                    "GamepadNexusChordEnabled":  0
+                                                                                },
+                                        "HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\GameDVR":  {
+                                                                                                             "KGLRevision":  2633,
+                                                                                                             "KGLToGCSUpdatedRevision":  2633,
+                                                                                                             "LastGameActivity":  [
+                                                                                                                                      64,
+                                                                                                                                      0,
+                                                                                                                                      33,
+                                                                                                                                      23,
+                                                                                                                                      126,
+                                                                                                                                      153,
+                                                                                                                                      220,
+                                                                                                                                      1
+                                                                                                                                  ]
+                                                                                                         },
+                                        "HKLM:\\SYSTEM\\CurrentControlSet\\Control\\GraphicsDrivers":  {
+                                                                                                           "HwSchMode":  2,
+                                                                                                           "UnsupportedMonitorModesAllowed":  1,
+                                                                                                           "MinDxgKrnlVersion":  20499,
+                                                                                                           "DxgKrnlVersion":  69639,
+                                                                                                           "PlatformSupportMiracast":  1
+                                                                                                       }
+                                    }
+                      }
+}

@@ -1,0 +1,156 @@
+{
+  "meta": {
+    "profileName": "Apex - Competitive",
+    "lastUpdatedISO": "2026-02-09T07:32:16",
+    "monitor": "ASUS ROG XG27AQDMG OLED 240Hz",
+    "gpu": "RTX 5070 Ti",
+    "os": "Windows 11",
+    "notes": "OLED + 240Hz. Focus: clarity + low latency + repeatable presets."
+  },
+  "targets": {
+    "refreshHz": 240,
+    "fpsTarget": 237,
+    "latencyGoalMs": 1
+  },
+  "toggles": {
+    "hdrWindowsOn": true,
+    "autoHdrOn": true,
+    "rtxHdrOn": false,
+    "gsyncOn": true,
+    "vsyncInGameOff": true,
+    "reflexBoostOn": true
+  },
+  "launchOptions": [
+    {
+      "key": "-novid",
+      "enabled": true,
+      "note": "Skip intro videos"
+    },
+    {
+      "key": "-dev",
+      "enabled": true,
+      "note": "Skip more startup animations (varies by patch)"
+    },
+    {
+      "key": "+fps_max 0",
+      "enabled": true,
+      "note": "Uncap FPS (cap elsewhere if desired)"
+    },
+    {
+      "key": "+lobby_max_fps 0",
+      "enabled": true,
+      "note": "Uncap lobby/menu FPS"
+    },
+    {
+      "key": "-no_render_on_input_thread",
+      "enabled": true,
+      "note": "Threading behavior (system/patch dependent)"
+    },
+    {
+      "key": "+m_rawinput 1",
+      "enabled": true,
+      "note": "Raw mouse input"
+    },
+    {
+      "key": "-refresh 240",
+      "enabled": false,
+      "note": "Force 240Hz at launch (only if needed)"
+    },
+    {
+      "key": "+mat_no_stretching 1",
+      "enabled": true,
+      "note": "Prevent stretching on aspect changes"
+    },
+    {
+      "key": "+clip_mouse_to_letterbox 0",
+      "enabled": true,
+      "note": "Cursor behavior with letterbox"
+    }
+  ],
+  "hdrSetup": {
+    "windows": [
+      "Settings \u2192 System \u2192 Display \u2192 Use HDR = ON",
+      "Auto HDR = ON (tune per-title via Win+G)",
+      "SDR brightness (in HDR) \u2248 35\u201340% for desktop readability",
+      "Run Windows HDR Calibration and save profile"
+    ],
+    "nvidia": [
+      "NVIDIA Control Panel \u2192 Change Resolution: RGB, Full, 10 bpc (if available)",
+      "G-SYNC ON; V-Sync OFF globally; in-game V-Sync OFF",
+      "Avoid heavy filters; prioritize clarity"
+    ],
+    "monitor": [
+      "Use DisplayPort",
+      "DSC = ON/Auto (needed for 240Hz + HDR bandwidth)",
+      "OLED care features = ON",
+      "Disable extra dynamic contrast modes; keep tone mapping consistent"
+    ],
+    "apexBehavior": [
+      "Apex has no native HDR toggle; Windows HDR/Auto HDR affects tone mapping",
+      "Use Win+G \u2192 HDR intensity until no gray fog but shadows still separate"
+    ]
+  },
+  "presets": {
+    "HDR ON (Auto HDR) \u2013 Competitive": {
+      "Windows": {
+        "HDR": "ON",
+        "Auto HDR": "ON",
+        "SDR brightness in HDR": "35\u201340%"
+      },
+      "NVIDIA": {
+        "RTX HDR": "OFF",
+        "RGB Range": "Full",
+        "10 bpc": "If available",
+        "G-SYNC": "ON",
+        "V-Sync Global": "OFF"
+      },
+      "Apex": {
+        "Fullscreen": "Yes",
+        "V-Sync": "OFF",
+        "Reflex": "ON+Boost",
+        "AA": "OFF",
+        "AO": "OFF",
+        "Shadows": "LOW/OFF"
+      }
+    },
+    "HDR OFF (SDR) \u2013 Competitive": {
+      "Windows": {
+        "HDR": "OFF",
+        "Auto HDR": "OFF"
+      },
+      "NVIDIA": {
+        "RTX HDR": "OFF",
+        "RGB Range": "Full",
+        "G-SYNC": "ON",
+        "V-Sync Global": "OFF"
+      },
+      "Apex": {
+        "Fullscreen": "Yes",
+        "V-Sync": "OFF",
+        "Reflex": "ON+Boost",
+        "AA": "OFF",
+        "AO": "OFF",
+        "Shadows": "LOW/OFF"
+      }
+    }
+  },
+  "performanceLogs": [],
+  "network": {
+    "connection": "Ethernet",
+    "dns": "Auto",
+    "router_model": "",
+    "modem_model": "",
+    "mtu": "",
+    "qos_enabled": "",
+    "bufferbloat_grade": "",
+    "isp": "",
+    "notes": "",
+    "tests": {
+      "speedtest_down_mbps": "",
+      "speedtest_up_mbps": "",
+      "speedtest_ping_ms": "",
+      "jitter_ms": "",
+      "packet_loss_pct": ""
+    }
+  }
+}
