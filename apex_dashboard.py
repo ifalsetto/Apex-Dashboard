@@ -45,8 +45,8 @@ for p in [SNAP_DIR, SCAN_DIR, EXPORT_DIR, PROFILES_DIR, DAILY_TEMP_DIR, TRASH_TO
     os.makedirs(p, exist_ok=True)
 
 # -------------------- Defaults --------------------
-DEFAULT_PROFILE: Dict[str, Any] = {
-    "meta": {
+DEFAULT_PROFILE: Dict[str, Any] = {}
+    "meta": {}
        "profileName": "Apex - Competitive (Generic)",
         "lastUpdatedISO": dt.datetime.now().isoformat(timespec="seconds"),
         "monitor": "Unknown / User provided",
