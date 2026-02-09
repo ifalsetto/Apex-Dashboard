@@ -26,5 +26,23 @@ Open a GitHub issue and include:
 
 \- screenshot if possible
 
+## Beta Testing (How to report bugs)
+
+
+
+1\. Open the app and reproduce the issue once.
+
+2\. Click \*\*Report a bug\*\* (left sidebar).
+
+3\. Fill in:
+
+&nbsp;  - Version (shown in sidebar)
+
+&nbsp;  - Steps to reproduce
+
+&nbsp;  - What you expected vs what happened
+
+4\. Optional: attach a screenshot.
+
 
 

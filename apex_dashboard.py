@@ -765,6 +765,10 @@ with st.sidebar:
     st.markdown("---")
     st.markdown("**Repo**")
     st.markdown(f"[Apex-Dashboard]({REPO_URL})")
+st.info(
+    "Beta testing: reproduce once → click 'Report a bug' → paste steps + screenshot if possible.",
+    icon="🧪"
+)
 
 if "profile" not in st.session_state:
     loaded = safe_load_json(AUTOSAVE_PATH)
