@@ -804,6 +804,13 @@ def parse_presentmon_csv(file_bytes: bytes) -> Dict[str, Any]:
 # -------------------- Streamlit Setup --------------------
 st.set_page_config(page_title=APP_TITLE, layout="wide")
 
+APP_VERSION = "v0.1.0-beta"
+BUG_URL = "https://github.com/ifalsetto/Apex-Dashboard/issues/new?template=bug_report.yml"
+
+with st.sidebar:
+    st.caption(f"Version: {APP_VERSION}")
+    st.link_button("Report a bug", BUG_URL)
+
 with st.sidebar:
     st.markdown(f"### {APP_TITLE}")
     st.caption(f"Version: {APP_VERSION}")
