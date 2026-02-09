@@ -8,3 +8,7 @@ venv/
 Snapshots/
 TempBin/
 _TRASH_BIN/
+Exports/
+Scans/
+StorageMap/
+Profiles/
