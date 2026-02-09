@@ -11,6 +11,8 @@ from typing import Dict, Any, Tuple, List, Optional
 
 import streamlit as st
 
+APP_VERSION = "v0.1.0-beta"
+REPO_ISSUES_URL = "https://github.com/ifalsetto/Apex-Dashboard/issues/new"
 APP_TITLE = "Apex Optimizer Dashboard"
 APEX_PROCESS_NAMES = ["r5apex", "r5apex.exe"]  # common Apex executable name
 
@@ -280,6 +282,8 @@ def settings_signature(profile: Dict[str, Any]) -> str:
 
 # -------------------- Windows helpers (PowerShell) --------------------
 def ps_run(cmd: str) -> str:
+    if not is_windows():
+        return ""
     try:
         out = subprocess.check_output(
             ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", cmd],
@@ -291,6 +295,8 @@ def ps_run(cmd: str) -> str:
         return ""
 
 def apex_process_running() -> bool:
+    if not is_windows():
+        return False
     check = r"""
 $names = @('r5apex','r5apex.exe')
 $found = $false
@@ -348,20 +354,45 @@ try { $p = Get-Process -Name r5apex -ErrorAction Stop; "{0}" -f $p.CPU } catch {
         return max(0.0, min(100.0, pct))
     except Exception:
         return 0.0
+        
+def is_windows() -> bool:
+    return platform.system().lower().startswith("win")
 
 def ping_sample(host: str = "1.1.1.1", count: int = 10) -> Tuple[Optional[int], Optional[float]]:
     try:
-        out = subprocess.check_output(["ping", "-n", str(count), host], text=True, errors="ignore")
+        if is_windows():
+            cmd = ["ping", "-n", str(count), host]
+        else:
+            cmd = ["ping", "-c", str(count), host]
+
+        out = subprocess.check_output(cmd, text=True, errors="ignore")
     except Exception:
         return None, None
+
     loss = None
+    # Windows: Lost = X (Y% loss)
     m = re.search(r"Lost = \d+ \((\d+)% loss\)", out, re.IGNORECASE)
     if m:
         loss = float(m.group(1))
+
+    # Linux/mac: X% packet loss
+    if loss is None:
+        m = re.search(r"(\d+(?:\.\d+)?)%\s*packet loss", out, re.IGNORECASE)
+        if m:
+            loss = float(m.group(1))
+
     avg = None
+    # Windows: Average = 12ms
     m2 = re.search(r"Average = (\d+)ms", out, re.IGNORECASE)
     if m2:
         avg = int(m2.group(1))
+
+    # Linux/mac: rtt min/avg/max/mdev = 10.0/12.0/...
+    if avg is None:
+        m3 = re.search(r"=\s*[\d\.]+/([\d\.]+)/", out)
+        if m3:
+            avg = int(float(m3.group(1)))
+
     return avg, loss
 
 # -------------------- Match Monitor (heuristic) --------------------
@@ -773,6 +804,13 @@ def parse_presentmon_csv(file_bytes: bytes) -> Dict[str, Any]:
 # -------------------- Streamlit Setup --------------------
 st.set_page_config(page_title=APP_TITLE, layout="wide")
 
+with st.sidebar:
+    st.markdown(f"### {APP_TITLE}")
+    st.caption(f"Version: {APP_VERSION}")
+    st.markdown(f"[Report a bug]({REPO_ISSUES_URL})")
+    st.caption("Include: steps + expected vs actual + screenshot if possible.")
+
+
 if "profile" not in st.session_state:
     loaded = safe_load_json(AUTOSAVE_PATH)
     st.session_state.profile = loaded if loaded else deep_copy(DEFAULT_PROFILE)
@@ -945,6 +983,10 @@ with tab_apex:
 # -------------------- Match Monitor Tab --------------------
 with tab_match:
     st.subheader("Match Monitor (Auto-detect start/end — safe heuristic)")
+    if not is_windows():
+    st.warning("Match Monitor is Windows-only (uses PowerShell + foreground window checks). Disabled on Streamlit Cloud.")
+    st.stop()
+    
     st.caption(
         "Safe mode: no injection, no memory reads. Uses Apex process + foreground window + timing streaks. "
         "End events are approximate."
