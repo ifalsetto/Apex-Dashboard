@@ -13,13 +13,13 @@ import streamlit as st
 
 # -------------------- App Identity --------------------
 APP_TITLE = "Apex Optimizer Dashboard"
-APP_VERSION = "v0.1.0-beta"
+APP_VERSION = "v0.1.1-beta"
 
 REPO_URL = "https://github.com/ifalsetto/Apex-Dashboard"
 BUG_URL = f"{REPO_URL}/issues/new?template=bug_report.yml"
 FEATURE_URL = f"{REPO_URL}/issues/new?template=feature_request.yml"
 
-APEX_PROCESS_NAMES = ["r5apex", "r5apex.exe"]  # common Apex executable name
+APEX_PROCESS_NAMES = ["r5apex", "r5apex.exe"]
 
 # -------------------- Paths (Repo Layout) --------------------
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -29,16 +29,13 @@ SCAN_DIR = os.path.join(BASE_DIR, "Scans")
 EXPORT_DIR = os.path.join(BASE_DIR, "Exports")
 PROFILES_DIR = os.path.join(BASE_DIR, "Profiles")
 
-# TempBin: safe-to-delete artifacts created by the app during the day
 TEMPBIN_DIR = os.path.join(BASE_DIR, "TempBin")
 TODAY_STR = dt.date.today().strftime("%Y-%m-%d")
 DAILY_TEMP_DIR = os.path.join(TEMPBIN_DIR, TODAY_STR)
 
-# Trash Bin: "move-first, delete-last"
 TRASHBIN_DIR = os.path.join(BASE_DIR, "_TRASH_BIN")
 TRASH_TODAY_DIR = os.path.join(TRASHBIN_DIR, TODAY_STR)
 
-# Storage Map outputs
 STORAGE_DIR = os.path.join(BASE_DIR, "StorageMap")
 STORAGE_MAP_JSON = os.path.join(STORAGE_DIR, "storage_map.json")
 STORAGE_MAP_CSV = os.path.join(STORAGE_DIR, "storage_map_view.csv")
@@ -140,7 +137,7 @@ DEFAULT_PROFILE: Dict[str, Any] = {
     },
 }
 
-# -------------------- Libraries (short; extend later) --------------------
+# -------------------- Libraries --------------------
 SETTING_LIBRARY = {
     "windows_hdr": {
         "title": "Windows HDR (Use HDR)",
@@ -169,7 +166,37 @@ LAUNCH_OPTION_LIBRARY = {
                    "scop": {"affects": ["FPS behavior", "thermals"], "risk_level": "Medium", "rollback": ["Disable or set fixed cap"], "verify": ["Stable cap"]}},
 }
 
-# -------------------- Helpers --------------------
+# -------------------- Friendly UI Labels --------------------
+UI = {
+    "tabs": {
+        "apex": "Setup",
+        "match": "Auto Match Log",
+        "hdr": "HDR Guide",
+        "presets": "Presets",
+        "perf": "Match History",
+        "net": "Network",
+        "scan": "Import & Autofill",
+        "storage": "Storage Audit",
+        "trash": "Safe Cleanup",
+        "ocr": "OCR (Optional)",
+        "presentmon": "FPS Import (Optional)",
+        "library": "Help Library",
+    },
+    "buttons": {
+        "snapshot": "Save Snapshot",
+        "reset": "Reset Profile",
+        "export": "Export Profile",
+    },
+    "labels": {
+        "profile_name": "Profile name",
+        "notes": "Notes (auto-written after matches)",
+        "refresh": "Monitor refresh rate (Hz)",
+        "fps_target": "FPS cap target",
+        "latency": "Latency goal (ms)",
+        "launch": "Steam launch options",
+    },
+}
+
 def now_iso() -> str:
     return dt.datetime.now().isoformat(timespec="seconds")
 
@@ -274,7 +301,7 @@ def hdr_method_label(toggles: Dict[str, Any]) -> str:
         return "RTX HDR"
     if toggles.get("autoHdrOn"):
         return "HDR ON (Auto HDR)"
-    return "HDR ON (no converter)"
+    return "HDR ON"
 
 def settings_signature(profile: Dict[str, Any]) -> str:
     p = {
@@ -516,25 +543,25 @@ def auto_write_notes(profile: Dict[str, Any], last_entry: Dict[str, Any], compar
     hdr_label = hdr_method_label(t)
 
     lines = []
-    lines.append("=== CURRENT COMP SETUP ===")
+    lines.append("=== CURRENT SETUP ===")
     lines.append(f"Version: {APP_VERSION}")
     lines.append(f"Refresh/FPS cap: {int(targets.get('refreshHz',0))}Hz / {int(targets.get('fpsTarget',0))} FPS")
-    lines.append(f"VRR: {'ON' if t.get('gsyncOn') else 'OFF'} | V-Sync (in-game): {'OFF' if t.get('vsyncInGameOff') else 'ON'} | Reflex: {'ON+Boost' if t.get('reflexBoostOn') else 'OFF'}")
-    lines.append(f"HDR path: {hdr_label}")
+    lines.append(f"VRR: {'ON' if t.get('gsyncOn') else 'OFF'} | In-game V-Sync: {'OFF' if t.get('vsyncInGameOff') else 'ON'} | Reflex: {'ON+Boost' if t.get('reflexBoostOn') else 'OFF'}")
+    lines.append(f"HDR mode: {hdr_label}")
     lines.append(f"Launch: {launch if launch else '(none)'}")
     lines.append("")
-    lines.append("=== LAST MATCH AUTO-LOG ===")
+    lines.append("=== LAST MATCH (AUTO) ===")
     lines.append(
         f"{last_entry.get('match_startISO','')} → {last_entry.get('match_endISO','')} "
         f"({last_entry.get('duration_s','')}s) | CPU avg {last_entry.get('cpu_avg_pct','')}% peak {last_entry.get('cpu_peak_pct','')}% | "
         f"Ping {last_entry.get('ping_ms','')}ms | Loss {last_entry.get('packet_loss_pct','')}% | "
         f"AvgFPS {last_entry.get('avg_fps','')} | 1%Low {last_entry.get('one_percent_low','')}"
     )
-    lines.append(f"Compare: {compare_text}")
+    lines.append(f"Compared to similar: {compare_text}")
     if last_entry.get("notes"):
         lines.append(f"Session note: {last_entry.get('notes')}")
     lines.append("")
-    lines.append("=== NEXT SUGGESTIONS ===")
+    lines.append("=== NEXT STEPS ===")
     if suggestions:
         for i, s in enumerate(suggestions, 1):
             lines.append(f"{i}. {s}")
@@ -701,7 +728,7 @@ def ocr_detect_end_screen_demo() -> Dict[str, Any]:
 
     keywords = ["CHAMPION", "SQUAD ELIMINATED", "MATCH SUMMARY", "YOU ARE THE CHAMPION", "ELIMINATED"]
     with mss.mss() as sct:
-        mon = sct.monitors[1]  # primary
+        mon = sct.monitors[1]
         img = sct.grab(mon)
         im = Image.frombytes("RGB", img.size, img.rgb)
 
@@ -756,7 +783,6 @@ def parse_presentmon_csv(file_bytes: bytes) -> Dict[str, Any]:
 # -------------------- Streamlit Setup --------------------
 st.set_page_config(page_title=APP_TITLE, layout="wide")
 
-# Sidebar: Beta ops + intake links (safe)
 with st.sidebar:
     st.markdown("### Apex Dashboard")
     st.caption(f"Version: {APP_VERSION}")
@@ -765,10 +791,8 @@ with st.sidebar:
     st.markdown("---")
     st.markdown("**Repo**")
     st.markdown(f"[Apex-Dashboard]({REPO_URL})")
-st.info(
-    "Beta testing: reproduce once → click 'Report a bug' → paste steps + screenshot if possible.",
-    icon="🧪"
-)
+
+st.info("Beta: reproduce once → click Report a bug → paste steps + screenshot.", icon="🧪")
 
 if "profile" not in st.session_state:
     loaded = safe_load_json(AUTOSAVE_PATH)
@@ -803,22 +827,25 @@ profile: Dict[str, Any] = st.session_state.profile
 # -------------------- Header --------------------
 st.title(APP_TITLE)
 st.caption(
-    f"Version: {APP_VERSION} • Profile: {profile['meta']['profileName']} • "
-    f"Monitor: {profile['meta']['monitor']} • GPU: {profile['meta']['gpu']} • Updated: {profile['meta']['lastUpdatedISO']}"
+    f"v{APP_VERSION} • Profile: {profile['meta']['profileName']} • "
+    f"Updated: {profile['meta']['lastUpdatedISO']}"
 )
 
 h1, h2, h3, h4, h5 = st.columns([2, 1, 1, 1, 1])
 
 with h1:
-    profile["meta"]["profileName"] = st.text_input("Profile name", profile["meta"]["profileName"])
+    profile["meta"]["profileName"] = st.text_input(UI["labels"]["profile_name"], profile["meta"]["profileName"])
 
 with h2:
-    if st.button("Snapshot NOW (dedup)", use_container_width=True):
+    if st.button(UI["buttons"]["snapshot"], use_container_width=True):
         saved, path = save_unique_json(SNAP_DIR, profile, "manual", "SNAP")
-        st.success(f"Snapshot saved: {path}") if saved else st.info(f"Duplicate already exists: {path}")
+        if saved:
+            st.success(f"Snapshot saved: {path}")
+        else:
+            st.info(f"Already saved (duplicate): {path}")
 
 with h3:
-    if st.button("Reset (snapshot first)", use_container_width=True):
+    if st.button(UI["buttons"]["reset"], use_container_width=True):
         save_unique_json(SNAP_DIR, profile, "before_reset", "SNAP")
         st.session_state.profile = deep_copy(DEFAULT_PROFILE)
         safe_save_json(AUTOSAVE_PATH, st.session_state.profile)
@@ -838,7 +865,7 @@ with h4:
     export_name = ("SANITIZED_" + export_name) if sanitize else export_name
 
     st.download_button(
-        "Export JSON",
+        UI["buttons"]["export"],
         data=json.dumps(export_obj, indent=2),
         file_name=export_name,
         mime="application/json",
@@ -846,7 +873,7 @@ with h4:
     )
 
 with h5:
-    up = st.file_uploader("Import JSON (profile or scan.json)", type=["json"], label_visibility="collapsed")
+    up = st.file_uploader("Import profile or scan JSON", type=["json"], label_visibility="collapsed")
     if up:
         try:
             raw = up.read()
@@ -860,7 +887,7 @@ with h5:
                 st.session_state["_scan"] = data
                 scan_path = os.path.join(DAILY_TEMP_DIR, f"scan_import_{dt.datetime.now().strftime('%H%M%S')}.json")
                 safe_save_json(scan_path, data)
-                st.success("Scan imported. Open Scan/Autofill tab to apply it.")
+                st.success("Scan imported. Open Import & Autofill to apply.")
             elif is_profile:
                 save_unique_json(SNAP_DIR, profile, "before_import_profile", "SNAP")
                 st.session_state.profile = data
@@ -872,39 +899,39 @@ with h5:
         except Exception as e:
             st.error(f"Import failed: {e}")
 
-profile["meta"]["notes"] = st.text_area("Notes (auto-updated after matches)", profile["meta"].get("notes", ""), height=220)
+profile["meta"]["notes"] = st.text_area(UI["labels"]["notes"], profile["meta"].get("notes", ""), height=200)
 st.divider()
 
 # -------------------- Tabs --------------------
-tab_apex, tab_match, tab_hdr, tab_presets, tab_perf, tab_net, tab_scan, tab_storage, tab_trash, tab_ocr, tab_presentmon, tab_library = st.tabs(
+tab_setup, tab_match, tab_hdr, tab_presets, tab_history, tab_net, tab_scan, tab_storage, tab_cleanup, tab_ocr, tab_fps, tab_help = st.tabs(
     [
-        "Apex",
-        "Match Monitor",
-        "HDR Setup",
-        "Presets",
-        "Performance Logs",
-        "Network",
-        "Scan/Autofill",
-        "Storage Map",
-        "Trash Bin",
-        "OCR Detector (optional)",
-        "PresentMon Import (optional)",
-        "SOP/SCOP + Tutorials",
+        UI["tabs"]["apex"],
+        UI["tabs"]["match"],
+        UI["tabs"]["hdr"],
+        UI["tabs"]["presets"],
+        UI["tabs"]["perf"],
+        UI["tabs"]["net"],
+        UI["tabs"]["scan"],
+        UI["tabs"]["storage"],
+        UI["tabs"]["trash"],
+        UI["tabs"]["ocr"],
+        UI["tabs"]["presentmon"],
+        UI["tabs"]["library"],
     ]
 )
 
-# -------------------- Apex Tab --------------------
-with tab_apex:
-    st.subheader("Performance Targets")
+# -------------------- Setup Tab --------------------
+with tab_setup:
+    st.subheader("Targets")
     t1, t2, t3 = st.columns(3)
     with t1:
-        profile["targets"]["refreshHz"] = st.number_input("Refresh (Hz)", 60, 360, int(profile["targets"]["refreshHz"]), 1)
+        profile["targets"]["refreshHz"] = st.number_input(UI["labels"]["refresh"], 60, 360, int(profile["targets"]["refreshHz"]), 1)
     with t2:
-        profile["targets"]["fpsTarget"] = st.number_input("FPS Target", 60, 600, int(profile["targets"]["fpsTarget"]), 1)
+        profile["targets"]["fpsTarget"] = st.number_input(UI["labels"]["fps_target"], 60, 600, int(profile["targets"]["fpsTarget"]), 1)
     with t3:
-        profile["targets"]["latencyGoalMs"] = st.number_input("Latency Goal (ms)", 1, 100, int(profile["targets"]["latencyGoalMs"]), 1)
+        profile["targets"]["latencyGoalMs"] = st.number_input(UI["labels"]["latency"], 1, 100, int(profile["targets"]["latencyGoalMs"]), 1)
 
-    st.subheader("System Toggles")
+    st.subheader("Toggles")
     g1, g2, g3 = st.columns(3)
     with g1:
         profile["toggles"]["hdrWindowsOn"] = st.toggle("Windows HDR", bool(profile["toggles"]["hdrWindowsOn"]))
@@ -916,7 +943,7 @@ with tab_apex:
         profile["toggles"]["vsyncInGameOff"] = st.toggle("In-game V-Sync OFF", bool(profile["toggles"]["vsyncInGameOff"]))
         profile["toggles"]["reflexBoostOn"] = st.toggle("Reflex (+Boost)", bool(profile["toggles"]["reflexBoostOn"]))
 
-    st.subheader("Steam Launch Options")
+    st.subheader(UI["labels"]["launch"])
     left, right = st.columns([2, 1])
     with left:
         for i, opt in enumerate(profile["launchOptions"]):
@@ -930,24 +957,21 @@ with tab_apex:
 
     launch_string = build_launch_string(profile["launchOptions"])
     with right:
-        st.caption("Current launch string")
+        st.caption("Copy/paste launch string")
         st.code(launch_string if launch_string else "(none)", language="text")
         st.download_button("Download launch.txt", data=launch_string, file_name="apex_launch_options.txt", use_container_width=True)
-        st.info("Safety: avoid -high and random outdated DX flags. Change one thing at a time.")
+        st.info("Tip: avoid random outdated flags. Change one thing at a time.")
 
-# -------------------- Match Monitor Tab --------------------
+# -------------------- Auto Match Log Tab --------------------
 with tab_match:
-    st.subheader("Match Monitor (Auto-detect start/end — safe heuristic)")
-    st.caption(
-        "Safe mode: no injection, no memory reads. Uses Apex process + foreground window + timing streaks. "
-        "End events are approximate."
-    )
+    st.subheader("Auto match logger (safe)")
+    st.caption("No injection. Uses process + foreground window + timing streaks. End events are approximate.")
 
     ms = st.session_state.monitor_state
 
     c1, c2, c3, c4 = st.columns(4)
     with c1:
-        ms["enabled"] = st.toggle("Monitoring enabled", bool(ms.get("enabled", False)))
+        ms["enabled"] = st.toggle("Enabled", bool(ms.get("enabled", False)))
     with c2:
         ms["poll_seconds"] = st.number_input("Poll interval (sec)", 1, 10, int(ms.get("poll_seconds", 3)), 1)
     with c3:
@@ -966,7 +990,6 @@ with tab_match:
             end_dt = dt.datetime.fromisoformat(ms["match_endISO"])
             duration_s = int((end_dt - start_dt).total_seconds())
             cpu_avg, cpu_peak = compute_cpu_stats(ms.get("cpu_samples", []))
-
             ping_ms, loss_pct = ping_sample("1.1.1.1", 10)
 
             sig = settings_signature(profile)
@@ -1011,22 +1034,20 @@ with tab_match:
             st.session_state.monitor_state = ms
 
             safe_save_json(AUTOSAVE_PATH, profile)
-            st.success("Match ended → auto-logged → compared → Notes updated.")
+            st.success("Match ended → saved to history → notes updated.")
 
     st.divider()
     s1, s2, s3 = st.columns(3)
     with s1:
         st.metric("Apex running", "YES" if ms.get("apex_running") else "NO")
     with s2:
-        st.metric("Apex foreground", "YES" if ms.get("apex_foreground") else "NO")
+        st.metric("Apex in front", "YES" if ms.get("apex_foreground") else "NO")
     with s3:
-        st.metric("In-match state", "YES" if ms.get("in_match") else "NO")
-    st.caption(f"Foreground process: {ms.get('fg_process','')}")
-    st.caption(f"Foreground title: {ms.get('fg_title','')[:120]}")
+        st.metric("Match detected", "YES" if ms.get("in_match") else "NO")
 
-# -------------------- HDR Setup Tab --------------------
+# -------------------- HDR Guide Tab --------------------
 with tab_hdr:
-    st.subheader("HDR Setup Checklist")
+    st.subheader("HDR guide")
     w, n, m = st.columns(3)
     with w:
         st.markdown("### Windows")
@@ -1041,20 +1062,20 @@ with tab_hdr:
         for x in profile["hdrSetup"]["monitor"]:
             st.write(f"- {x}")
 
-    st.markdown("### Apex behavior")
+    st.markdown("### Apex notes")
     for x in profile["hdrSetup"]["apexBehavior"]:
         st.write(f"- {x}")
 
 # -------------------- Presets Tab --------------------
 with tab_presets:
-    st.subheader("Competitive Presets")
+    st.subheader("Presets")
     preset_names = list(profile["presets"].keys())
     choice = st.radio("Choose preset", preset_names, horizontal=True)
     st.json(profile["presets"][choice])
 
-# -------------------- Performance Logs Tab --------------------
-with tab_perf:
-    st.subheader("Performance Logs")
+# -------------------- Match History Tab --------------------
+with tab_history:
+    st.subheader("Match history")
     logs = profile.get("performanceLogs", [])
 
     cA, cB = st.columns([1, 1])
@@ -1078,7 +1099,7 @@ with tab_perf:
     if logs:
         st.dataframe(logs, use_container_width=True, hide_index=True)
     else:
-        st.info("No logs yet. Enable Match Monitor and play a match.")
+        st.info("No logs yet. Enable Auto Match Log and play a match.")
 
 # -------------------- Network Tab --------------------
 with tab_net:
@@ -1089,7 +1110,7 @@ with tab_net:
     with a1:
         net["isp"] = st.text_input("ISP", value=net.get("isp", ""))
         net["connection"] = st.selectbox("Connection", ["Ethernet", "Wi-Fi"], index=0 if net.get("connection") == "Ethernet" else 1)
-        net["dns"] = st.text_input("DNS (Auto / 1.1.1.1 / 8.8.8.8 etc.)", value=net.get("dns", "Auto"))
+        net["dns"] = st.text_input("DNS (Auto / 1.1.1.1 / 8.8.8.8)", value=net.get("dns", "Auto"))
     with a2:
         net["router_model"] = st.text_input("Router model", value=net.get("router_model", ""))
         net["modem_model"] = st.text_input("Modem model", value=net.get("modem_model", ""))
@@ -1100,20 +1121,20 @@ with tab_net:
         net["notes"] = st.text_area("Network notes", value=net.get("notes", ""), height=90)
 
     st.divider()
-    st.subheader("Quick ping sample")
+    st.subheader("Quick ping test")
     if st.button("Ping 1.1.1.1 (10 packets)", use_container_width=True):
         p, l = ping_sample("1.1.1.1", 10)
         st.write(f"Avg ping: {p}ms | Loss: {l}%")
 
-# -------------------- Scan/Autofill Tab --------------------
+# -------------------- Import & Autofill Tab --------------------
 with tab_scan:
-    st.subheader("Scan/Autofill (safe)")
-    st.caption("Import scan.json (from your exporter) using Import JSON (top right).")
+    st.subheader("Import & autofill")
+    st.caption("Import scan.json using the import box at the top right.")
 
     scanned = st.session_state.get("_scan")
     if scanned:
         st.json(scanned)
-        if st.button("Apply scan → profile fields (safe)", use_container_width=True):
+        if st.button("Apply scan to profile (safe)", use_container_width=True):
             sysinfo = scanned.get("system", {})
             gpus = sysinfo.get("gpus", [])
             dns = sysinfo.get("dnsServers", [])
@@ -1135,20 +1156,17 @@ with tab_scan:
                 profile["network"]["dns"] = ", ".join([str(x) for x in dns[:3]])
 
             safe_save_json(AUTOSAVE_PATH, profile)
-            st.success("Scan applied to profile (GPU/refresh/DNS).")
+            st.success("Applied GPU/refresh/DNS from scan.")
             st.rerun()
     else:
         st.info("No scan loaded yet.")
 
-# -------------------- Storage Map Tab --------------------
+# -------------------- Storage Audit Tab --------------------
 with tab_storage:
-    st.subheader("Storage Map (runs on-demand)")
-    st.caption(
-        "This does NOT read file contents. It only counts files, totals sizes, file types, and date ranges. "
-        "It scans ONLY the locations you approve below."
-    )
+    st.subheader("Storage audit (safe)")
+    st.caption("Does NOT read file contents. Counts files/sizes/types only, within approved folders.")
 
-    st.markdown("### Approved scan locations (edit + toggle)")
+    st.markdown("### Approved folders")
     plan = st.session_state.scan_plan
 
     for i, item in enumerate(plan):
@@ -1156,18 +1174,17 @@ with tab_storage:
         with c1:
             plan[i]["enabled"] = st.checkbox("Scan", value=bool(item.get("enabled", True)), key=f"scan_en_{i}")
         with c2:
-            plan[i]["label"] = st.text_input("Label", value=item.get("label", ""), key=f"scan_label_{i}")
+            plan[i]["label"] = st.text_input("Name", value=item.get("label", ""), key=f"scan_label_{i}")
         with c3:
             plan[i]["path"] = st.text_input("Path", value=item.get("path", ""), key=f"scan_path_{i}")
 
     st.session_state.scan_plan = plan
 
     st.divider()
-    st.markdown("### Consent + run")
-    consent = st.checkbox("I approve scanning ONLY the enabled paths shown above.", value=False)
-    max_files = st.number_input("Safety limit: max files per path", 500, 200000, 25000, 500)
+    consent = st.checkbox("I approve scanning ONLY the enabled folders above.", value=False)
+    max_files = st.number_input("Safety limit: max files per folder", 500, 200000, 25000, 500)
 
-    if consent and st.button("Build / Update Storage Map NOW", type="primary", use_container_width=True):
+    if consent and st.button("Run storage audit now", type="primary", use_container_width=True):
         results = []
         for it in plan:
             if not it.get("enabled"):
@@ -1182,18 +1199,17 @@ with tab_storage:
 
         write_storage_map(results)
         st.session_state.storage_map = safe_load_json(STORAGE_MAP_JSON) or {}
-        safe_save_json(os.path.join(DAILY_TEMP_DIR, f"storage_map_build_{dt.datetime.now().strftime('%H%M%S')}.json"), st.session_state.storage_map)
-        st.success("Storage map updated.")
+        safe_save_json(os.path.join(DAILY_TEMP_DIR, f"storage_audit_{dt.datetime.now().strftime('%H%M%S')}.json"), st.session_state.storage_map)
+        st.success("Storage audit updated.")
 
     st.divider()
-    st.markdown("### Current Storage Map (latest)")
     current = st.session_state.storage_map or safe_load_json(STORAGE_MAP_JSON) or {}
     if current and "results" in current:
-        st.caption(f"Created: {current.get('createdISO', '')}")
+        st.caption(f"Last run: {current.get('createdISO', '')}")
         flat = []
         for r in current.get("results", []):
             flat.append({
-                "label": r.get("label", ""),
+                "name": r.get("label", ""),
                 "path": r.get("path", ""),
                 "exists": r.get("exists", ""),
                 "files": r.get("total_files", ""),
@@ -1209,26 +1225,15 @@ with tab_storage:
         if os.path.exists(STORAGE_MAP_CSV):
             st.download_button("Download storage_map_view.csv", data=open(STORAGE_MAP_CSV, "rb").read(), file_name="storage_map_view.csv", use_container_width=True)
 
-        with st.expander("File type breakdown"):
-            for r in current.get("results", []):
-                st.markdown(f"**{r.get('label', '')}**")
-                tc = r.get("type_counts", {})
-                if tc:
-                    st.json(tc)
-                else:
-                    st.write("(none)")
     else:
-        st.info("No storage map yet. Approve and run the scan above.")
+        st.info("No audit yet. Run it above.")
 
-# -------------------- Trash Bin Tab --------------------
-with tab_trash:
-    st.subheader("Trash Bin (move-first, delete-last)")
-    st.caption(
-        "Workflow: (1) Move today’s temp artifacts into Trash Bin, (2) Review, (3) Empty Trash when you decide. "
-        "This protects you from accidental deletes."
-    )
+# -------------------- Safe Cleanup Tab --------------------
+with tab_cleanup:
+    st.subheader("Safe cleanup (Trash Bin)")
+    st.caption("Move-first → delete-last. Only deletes inside today’s Trash folder when confirmed.")
 
-    st.markdown("### Today’s TempBin")
+    st.markdown("### Today’s Temp files")
     st.code(DAILY_TEMP_DIR, language="text")
     temp_files = list_files_recursive(DAILY_TEMP_DIR) if os.path.exists(DAILY_TEMP_DIR) else []
     if temp_files:
@@ -1237,20 +1242,16 @@ with tab_trash:
     else:
         st.info("No temp files today yet.")
 
-    colA, colB = st.columns(2)
-    with colA:
-        if st.button("Move ALL TempBin files → Trash Bin", use_container_width=True):
-            moved = 0
-            for f in list(temp_files):
-                ok, _dst = safe_move_to_trash(f)
-                if ok:
-                    moved += 1
-            st.success(f"Moved {moved} files to Trash Bin.")
-    with colB:
-        st.write("")
+    if st.button("Move all temp files to Trash", use_container_width=True):
+        moved = 0
+        for f in list(temp_files):
+            ok, _dst = safe_move_to_trash(f)
+            if ok:
+                moved += 1
+        st.success(f"Moved {moved} files to Trash.")
 
     st.divider()
-    st.markdown("### Today’s Trash Bin")
+    st.markdown("### Today’s Trash")
     st.code(TRASH_TODAY_DIR, language="text")
     trash_files = list_files_recursive(TRASH_TODAY_DIR) if os.path.exists(TRASH_TODAY_DIR) else []
     if trash_files:
@@ -1260,53 +1261,51 @@ with tab_trash:
         st.info("Trash is empty.")
 
     st.divider()
-    st.markdown("### Empty Trash (deletes files inside today’s Trash Bin only)")
-    confirm = st.text_input("Type DELETE to enable emptying Trash", value="")
+    st.markdown("### Empty Trash (today only)")
+    confirm = st.text_input("Type DELETE to unlock", value="")
     if confirm == "DELETE":
-        if st.button("EMPTY today’s Trash Bin NOW", type="primary", use_container_width=True):
+        if st.button("Empty today’s Trash now", type="primary", use_container_width=True):
             files_deleted, dirs_deleted = safe_empty_trash_today()
-            st.success(f"Deleted {files_deleted} files; removed {dirs_deleted} directories (Trash Bin only).")
+            st.success(fDeleted {files_deleted} files; removed {dirs_deleted} directories (Trash only).")
     else:
         st.warning("Deletion locked. Type DELETE exactly.")
 
-# -------------------- OCR Detector Tab (optional) --------------------
+# -------------------- OCR (Optional) --------------------
 with tab_ocr:
-    st.subheader("OCR End-Screen Detector (optional)")
+    st.subheader("OCR end-screen detector (optional)")
     ok, msg = ocr_available()
     if not ok:
         st.error("OCR deps not installed.")
         st.code(
             "pip install pytesseract pillow mss\n"
             "Also install Tesseract OCR:\n"
-            "  - Windows: install 'tesseract-ocr' and add it to PATH\n",
+            "  - Windows: install tesseract-ocr and add it to PATH\n",
             language="text"
         )
         st.caption(f"Missing/issue: {msg}")
     else:
-        st.success("OCR dependencies detected.")
-        st.caption("Safe demo tool (screen capture + OCR). No injection into Apex.")
-        if st.button("Run OCR scan NOW (1 capture)", use_container_width=True):
+        st.success("OCR is available.")
+        st.caption("Safe demo (screen capture + OCR). No injection into Apex.")
+        if st.button("Run OCR scan (1 capture)", use_container_width=True):
             try:
                 res = ocr_detect_end_screen_demo()
-                st.write("Detected keyword hits:", res.get("hits", []))
+                st.write("Keyword hits:", res.get("hits", []))
                 st.text_area("OCR preview (upper)", res.get("text_preview", ""), height=220)
                 safe_save_json(os.path.join(DAILY_TEMP_DIR, f"ocr_capture_{dt.datetime.now().strftime('%H%M%S')}.json"), res)
             except Exception as e:
                 st.error(f"OCR scan failed: {e}")
 
-# -------------------- PresentMon Import Tab (optional) --------------------
-with tab_presentmon:
-    st.subheader("PresentMon FPS Import (optional)")
-    st.caption(
-        "Imports a PresentMon CSV you already captured, computes Avg FPS + 1% Low, "
-        "and lets you apply it to the latest match log."
-    )
+# -------------------- FPS Import (Optional) --------------------
+with tab_fps:
+    st.subheader("FPS import (PresentMon CSV)")
+    st.caption("Upload a PresentMon CSV you already captured → computes Avg FPS + 1% Low → apply to latest match.")
+
     upcsv = st.file_uploader("Upload PresentMon CSV", type=["csv"])
     if upcsv:
         result = parse_presentmon_csv(upcsv.read())
         if result.get("ok"):
             st.success(f"Parsed {result['samples']} samples → Avg FPS {result['avg_fps']} | 1% Low {result['one_percent_low']}")
-            if st.button("Apply to latest match entry", use_container_width=True):
+            if st.button("Apply to latest match", use_container_width=True):
                 logs = profile.get("performanceLogs", [])
                 if not logs:
                     st.error("No match logs exist yet.")
@@ -1322,14 +1321,14 @@ with tab_presentmon:
                     profile["meta"]["notes"] = auto_write_notes(profile, logs[0], compare_text, suggestions)
                     safe_save_json(AUTOSAVE_PATH, profile)
                     safe_save_json(os.path.join(DAILY_TEMP_DIR, f"presentmon_import_{dt.datetime.now().strftime('%H%M%S')}.json"), result)
-                    st.success("Applied FPS metrics to latest match entry.")
+                    st.success("Applied FPS metrics to latest match.")
         else:
             st.error(result.get("error", "Parse failed."))
 
-# -------------------- SOP/SCOP + Tutorials Tab --------------------
-with tab_library:
-    st.subheader("SOP/SCOP + Tutorials")
-    mode = st.radio("Library", ["Settings (Windows/NVIDIA/Apex)", "Steam Launch Options"], horizontal=True)
+# -------------------- Help Library --------------------
+with tab_help:
+    st.subheader("Help library")
+    mode = st.radio("Topic", ["Settings (Windows/NVIDIA/Apex)", "Steam Launch Options"], horizontal=True)
     query = st.text_input("Search", value="")
 
     lib = SETTING_LIBRARY if mode == "Settings (Windows/NVIDIA/Apex)" else LAUNCH_OPTION_LIBRARY
@@ -1341,13 +1340,13 @@ with tab_library:
     if not keys:
         st.info("No matches.")
     else:
-        selected = st.selectbox("Select", keys, format_func=lambda k: lib[k]["title"])
+        selected = st.selectbox("Pick one", keys, format_func=lambda k: lib[k]["title"])
         item = lib[selected]
 
         st.markdown(f"## {item['title']}")
         st.markdown(f"**What it does:** {item.get('what_it_does','')}")
 
-        st.markdown("### Interactions / Dependencies")
+        st.markdown("### Interactions")
         for x in item.get("interactions", []):
             st.write(f"- {x}")
 
@@ -1359,17 +1358,17 @@ with tab_library:
             st.markdown("### Cons")
             for x in item.get("cons", []):
                 st.write(f"- {x}")
-            st.markdown("### Negatives / Pitfalls")
+            st.markdown("### Pitfalls")
             for x in item.get("negatives", []):
                 st.write(f"- {x}")
 
         with c2:
-            st.markdown("### SOP (Step-by-step)")
+            st.markdown("### Steps")
             for i, step in enumerate(item.get("sop", []), start=1):
                 st.write(f"{i}. {step}")
 
             scop = item.get("scop", {})
-            st.markdown("### SCOP (Scope/Impact)")
+            st.markdown("### Risk / Scope")
             st.write(f"**Risk level:** {scop.get('risk_level','Unknown')}")
             if scop.get("affects"):
                 st.markdown("**Affects:**")
