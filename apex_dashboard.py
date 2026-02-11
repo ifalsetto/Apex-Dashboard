@@ -1,3 +1,4 @@
+﻿# EDIT_TEST 2026-02-11T08:40:19
 import json
 import os
 import csv
@@ -78,13 +79,13 @@ DEFAULT_PROFILE: Dict[str, Any] = {
     ],
     "hdrSetup": {
         "windows": [
-            "Settings → System → Display → Use HDR = ON",
+            "Settings â†’ System â†’ Display â†’ Use HDR = ON",
             "Auto HDR = ON (tune per-title via Win+G if available)",
-            "SDR brightness (in HDR) start ≈ 35–40% for desktop readability",
+            "SDR brightness (in HDR) start â‰ˆ 35â€“40% for desktop readability",
             "Run Windows HDR Calibration and save the profile",
         ],
         "nvidia": [
-            "NVIDIA Control Panel → Change Resolution: RGB, Full, 10 bpc (if available)",
+            "NVIDIA Control Panel â†’ Change Resolution: RGB, Full, 10 bpc (if available)",
             "G-SYNC ON; V-Sync OFF globally; in-game V-Sync OFF",
             "Avoid heavy filters; prioritize clarity",
         ],
@@ -100,12 +101,12 @@ DEFAULT_PROFILE: Dict[str, Any] = {
         ],
     },
     "presets": {
-        "HDR ON (Auto HDR) – Competitive": {
-            "Windows": {"HDR": "ON", "Auto HDR": "ON", "SDR brightness in HDR": "35–40%"},
+        "HDR ON (Auto HDR) â€“ Competitive": {
+            "Windows": {"HDR": "ON", "Auto HDR": "ON", "SDR brightness in HDR": "35â€“40%"},
             "NVIDIA": {"RTX HDR": "OFF", "RGB Range": "Full", "10 bpc": "If available", "G-SYNC": "ON", "V-Sync Global": "OFF"},
             "Apex": {"Fullscreen": "Yes", "V-Sync": "OFF", "Reflex": "ON+Boost", "AA": "OFF", "AO": "OFF", "Shadows": "LOW/OFF"},
         },
-        "HDR OFF (SDR) – Competitive": {
+        "HDR OFF (SDR) â€“ Competitive": {
             "Windows": {"HDR": "OFF", "Auto HDR": "OFF"},
             "NVIDIA": {"RTX HDR": "OFF", "RGB Range": "Full", "G-SYNC": "ON", "V-Sync Global": "OFF"},
             "Apex": {"Fullscreen": "Yes", "V-Sync": "OFF", "Reflex": "ON+Boost", "AA": "OFF", "AO": "OFF", "Shadows": "LOW/OFF"},
@@ -147,9 +148,9 @@ SETTING_LIBRARY = {
         "cons": ["Can look washed if not calibrated", "Desktop may appear different vs SDR"],
         "negatives": ["Gray fog/raised blacks if calibration/intensity is wrong"],
         "sop": [
-            "Settings → System → Display → select monitor",
+            "Settings â†’ System â†’ Display â†’ select monitor",
             "Use HDR = ON (or OFF for SDR baseline)",
-            "HDR settings: SDR brightness (in HDR) start 35–40%",
+            "HDR settings: SDR brightness (in HDR) start 35â€“40%",
             "Run Windows HDR Calibration",
         ],
         "scop": {"affects": ["Desktop tone mapping", "Game tone mapping"], "risk_level": "Medium", "rollback": ["HDR OFF"], "verify": ["No gray haze in shadows"]},
@@ -160,7 +161,7 @@ LAUNCH_OPTION_LIBRARY = {
     "-novid": {"title": "-novid", "what_it_does": "Skips intro videos.", "interactions": ["None."], "pros": ["Faster boot."], "cons": ["None."], "negatives": ["None."],
               "sop": ["Enable -novid.", "Launch once to verify."], "scop": {"affects": ["Startup"], "risk_level": "Low", "rollback": ["Disable flag"], "verify": ["Launch normal"]}},
     "-dev": {"title": "-dev", "what_it_does": "Skips some startup behavior (varies).", "interactions": ["Pairs with -novid."], "pros": ["Often faster startup."], "cons": ["Patch dependent."],
-             "negatives": ["Can behave differently after updates."], "sop": ["Enable -dev.", "Launch twice to verify."], "scop": {"affects": ["Startup"], "risk_level": "Low–Medium", "rollback": ["Disable flag"], "verify": ["No weird boot"]}},
+             "negatives": ["Can behave differently after updates."], "sop": ["Enable -dev.", "Launch twice to verify."], "scop": {"affects": ["Startup"], "risk_level": "Lowâ€“Medium", "rollback": ["Disable flag"], "verify": ["No weird boot"]}},
     "+fps_max 0": {"title": "+fps_max 0", "what_it_does": "Uncaps in-engine FPS cap (0 = uncapped).", "interactions": ["Still cap below refresh (237 @ 240Hz)."], "pros": ["Lets you cap elsewhere."],
                    "cons": ["More heat/power if uncapped."], "negatives": ["VRR ceiling issues if no cap."], "sop": ["Enable +fps_max 0.", "Cap to 237 using ONE method.", "Test+log."],
                    "scop": {"affects": ["FPS behavior", "thermals"], "risk_level": "Medium", "rollback": ["Disable or set fixed cap"], "verify": ["Stable cap"]}},
@@ -523,7 +524,7 @@ def make_suggestions(profile: Dict[str, Any]) -> List[str]:
     refresh = int(targets.get("refreshHz", 0) or 0)
 
     if refresh >= 120 and fps_target >= refresh:
-        suggestions.append("Cap FPS to 2–3 below refresh (e.g., 237 for 240Hz) for VRR/Reflex consistency.")
+        suggestions.append("Cap FPS to 2â€“3 below refresh (e.g., 237 for 240Hz) for VRR/Reflex consistency.")
 
     if t.get("autoHdrOn") and t.get("rtxHdrOn"):
         suggestions.append("Disable one: Auto HDR OR RTX HDR. Stacking can reduce clarity (double tone-map).")
@@ -552,7 +553,7 @@ def auto_write_notes(profile: Dict[str, Any], last_entry: Dict[str, Any], compar
     lines.append("")
     lines.append("=== LAST MATCH (AUTO) ===")
     lines.append(
-        f"{last_entry.get('match_startISO','')} → {last_entry.get('match_endISO','')} "
+        f"{last_entry.get('match_startISO','')} â†’ {last_entry.get('match_endISO','')} "
         f"({last_entry.get('duration_s','')}s) | CPU avg {last_entry.get('cpu_avg_pct','')}% peak {last_entry.get('cpu_peak_pct','')}% | "
         f"Ping {last_entry.get('ping_ms','')}ms | Loss {last_entry.get('packet_loss_pct','')}% | "
         f"AvgFPS {last_entry.get('avg_fps','')} | 1%Low {last_entry.get('one_percent_low','')}"
@@ -827,7 +828,7 @@ profile: Dict[str, Any] = st.session_state.profile
 # -------------------- Header --------------------
 st.title(APP_TITLE)
 st.caption(
-    f"v{APP_VERSION} • Profile: {profile['meta']['profileName']} • "
+    f"v{APP_VERSION} â€¢ Profile: {profile['meta']['profileName']} â€¢ "
     f"Updated: {profile['meta']['lastUpdatedISO']}"
 )
 
@@ -1034,7 +1035,7 @@ with tab_match:
             st.session_state.monitor_state = ms
 
             safe_save_json(AUTOSAVE_PATH, profile)
-            st.success("Match ended → saved to history → notes updated.")
+            st.success("Match ended â†’ saved to history â†’ notes updated.")
 
     st.divider()
     s1, s2, s3 = st.columns(3)
@@ -1231,9 +1232,9 @@ with tab_storage:
 # -------------------- Safe Cleanup Tab --------------------
 with tab_cleanup:
     st.subheader("Safe cleanup (Trash Bin)")
-    st.caption("Move-first → delete-last. Only deletes inside today’s Trash folder when confirmed.")
+    st.caption("Move-first â†’ delete-last. Only deletes inside todayâ€™s Trash folder when confirmed.")
 
-    st.markdown("### Today’s Temp files")
+    st.markdown("### Todayâ€™s Temp files")
     st.code(DAILY_TEMP_DIR, language="text")
     temp_files = list_files_recursive(DAILY_TEMP_DIR) if os.path.exists(DAILY_TEMP_DIR) else []
     if temp_files:
@@ -1251,7 +1252,7 @@ with tab_cleanup:
         st.success(f"Moved {moved} files to Trash.")
 
     st.divider()
-    st.markdown("### Today’s Trash")
+    st.markdown("### Todayâ€™s Trash")
     st.code(TRASH_TODAY_DIR, language="text")
     trash_files = list_files_recursive(TRASH_TODAY_DIR) if os.path.exists(TRASH_TODAY_DIR) else []
     if trash_files:
@@ -1264,9 +1265,9 @@ with tab_cleanup:
     st.markdown("### Empty Trash (today only)")
     confirm = st.text_input("Type DELETE to unlock", value="")
     if confirm == "DELETE":
-        if st.button("Empty today’s Trash now", type="primary", use_container_width=True):
+        if st.button("Empty todayâ€™s Trash now", type="primary", use_container_width=True):
             files_deleted, dirs_deleted = safe_empty_trash_today()
-            st.success(fDeleted {files_deleted} files; removed {dirs_deleted} directories (Trash only).")
+            st.success(f"Deleted {files_deleted} files; removed {dirs_deleted} directories (Trash only).")
     else:
         st.warning("Deletion locked. Type DELETE exactly.")
 
@@ -1298,13 +1299,13 @@ with tab_ocr:
 # -------------------- FPS Import (Optional) --------------------
 with tab_fps:
     st.subheader("FPS import (PresentMon CSV)")
-    st.caption("Upload a PresentMon CSV you already captured → computes Avg FPS + 1% Low → apply to latest match.")
+    st.caption("Upload a PresentMon CSV you already captured â†’ computes Avg FPS + 1% Low â†’ apply to latest match.")
 
     upcsv = st.file_uploader("Upload PresentMon CSV", type=["csv"])
     if upcsv:
         result = parse_presentmon_csv(upcsv.read())
         if result.get("ok"):
-            st.success(f"Parsed {result['samples']} samples → Avg FPS {result['avg_fps']} | 1% Low {result['one_percent_low']}")
+            st.success(f"Parsed {result['samples']} samples â†’ Avg FPS {result['avg_fps']} | 1% Low {result['one_percent_low']}")
             if st.button("Apply to latest match", use_container_width=True):
                 logs = profile.get("performanceLogs", [])
                 if not logs:
@@ -1387,3 +1388,6 @@ with tab_help:
 profile = bump_updated(profile)
 st.session_state.profile = profile
 safe_save_json(AUTOSAVE_PATH, st.session_state.profile)
+
+
+
