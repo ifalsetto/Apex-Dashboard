@@ -9,6 +9,7 @@ import subprocess
 import re
 import time
 from typing import Dict, Any, Tuple, List, Optional
+from streamlit_autorefresh import st_autorefresh
 
 import streamlit as st
 
@@ -981,7 +982,8 @@ with tab_match:
         ms["end_streak_needed"] = st.number_input("End streak (ticks)", 2, 20, int(ms.get("end_streak_needed", 6)), 1)
 
     if ms["enabled"]:
-        st.autorefresh(interval=int(ms["poll_seconds"]) * 1000, key="autorefresh_match")
+        st_autorefresh(interval=int(ms["poll_seconds"]) * 1000, key="autorefresh_match")
+
         ms = monitor_tick(ms)
         st.session_state.monitor_state = ms
 
