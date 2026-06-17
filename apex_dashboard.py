@@ -635,6 +635,33 @@ SAFE_SCAN_PRESETS = [
     {"label": "Apex Dashboard\\_TRASH_BIN", "path": TRASHBIN_DIR, "enabled": True},
 ]
 
+def _safe_scan_roots() -> List[str]:
+    roots: List[str] = []
+    for p in [x.get("path", "") for x in SAFE_SCAN_PRESETS]:
+        if not p:
+            continue
+        try:
+            roots.append(os.path.realpath(p))
+        except Exception:
+            pass
+    return roots
+
+def _is_within_allowed_roots(path: str, allowed_roots: List[str]) -> bool:
+    try:
+        rp = os.path.realpath(path)
+        for root in allowed_roots:
+            if os.path.commonpath([rp, root]) == root:
+                return True
+    except Exception:
+        return False
+    return False
+
+def _validated_scan_path(path: str) -> str:
+    rp = os.path.realpath(path)
+    if _is_within_allowed_roots(rp, _safe_scan_roots()):
+        return rp
+    raise ValueError("Path is outside approved scan roots.")
+
 def dir_stats(root: str, max_files: int = 25000) -> Dict[str, Any]:
     total_files = 0
     total_bytes = 0
@@ -1196,7 +1223,12 @@ with tab_storage:
             label = it.get("label", "").strip() or path
             if not path:
                 continue
-            r = dir_stats(path, max_files=int(max_files))
+            try:
+                safe_path = _validated_scan_path(path)
+            except Exception:
+                st.warning(f"Skipped '{label}': path is outside approved scan roots.")
+                continue
+            r = dir_stats(safe_path, max_files=int(max_files))
             r["label"] = label
             results.append(r)
 
