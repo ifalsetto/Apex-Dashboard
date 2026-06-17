@@ -1,6 +1,6 @@
 """Apex Optimizer Dashboard - Refactored main application."""
-import json
-import os
+                    import json
+                    import os
 import csv
 import hashlib
 import datetime as dt
