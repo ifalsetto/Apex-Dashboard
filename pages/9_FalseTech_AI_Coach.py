@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import streamlit as st
+import performance_patch  # apply performance patches
 
 from false_apex_ai import (
     OPENAI_MODEL_DEFAULT,
