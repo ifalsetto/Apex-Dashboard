@@ -649,11 +649,18 @@ def _safe_scan_roots() -> List[str]:
 def _is_within_allowed_roots(path: str, allowed_roots: List[str]) -> bool:
     try:
         rp = os.path.realpath(path)
-        for root in allowed_roots:
-            if os.path.commonpath([rp, root]) == root:
-                return True
     except Exception:
         return False
+
+    for root in allowed_roots:
+        try:
+            rr = os.path.realpath(root)
+            if not rr:
+                continue
+            if os.path.commonpath([rp, rr]) == rr:
+                return True
+        except Exception:
+            continue
     return False
 
 def _validated_scan_path(path: str) -> str:
