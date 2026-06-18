@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import os
 from typing import Optional, Tuple
@@ -111,16 +111,21 @@ def render_api_status_panel() -> None:
             st.write(st.session_state.tracker_auth_detail)
 
         if test_clicked:
-            status, detail = _test_tracker_auth()
-            st.session_state.tracker_auth_status = status
-            st.session_state.tracker_auth_detail = detail
+            with st.status("Testing Tracker auth...", expanded=True) as status_box:
+                status, detail = _test_tracker_auth()
+                st.session_state.tracker_auth_status = status
+                st.session_state.tracker_auth_detail = detail
 
-            if status == "Valid":
-                st.success(detail)
-            elif status in {"Invalid", "Forbidden", "Missing"}:
-                st.warning(detail)
-            else:
-                st.info(detail)
+                if status == "Valid":
+                    status_box.update(label="Tracker auth valid", state="complete")
+                    st.success(detail)
+                    st.toast("Tracker auth valid.", icon="?")
+                elif status in {"Invalid", "Forbidden", "Missing"}:
+                    status_box.update(label=f"Tracker auth: {status}", state="error")
+                    st.warning(detail)
+                else:
+                    status_box.update(label=f"Tracker auth: {status}", state="complete")
+                    st.info(detail)
 
         with st.expander("Expected secret names"):
             st.code(

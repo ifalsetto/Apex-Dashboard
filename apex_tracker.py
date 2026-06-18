@@ -179,6 +179,7 @@ def tracker_fallback_profile(*, query: str = "Apex Player", platform: str = "ori
     }
 
 
+@st.cache_data(ttl=120, show_spinner=False)
 def fetch_tracker_profile(query: str, platform: str) -> Dict[str, Any]:
     clean_query = str(query or "").strip()
     clean_platform = normalize_platform(platform)

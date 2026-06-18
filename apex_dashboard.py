@@ -1125,6 +1125,7 @@ with tabs[4]:
             "settings_signature": profile_hash(profile),
         })
         st.success("Match log added.")
+        st.toast("Match log added.", icon="?")
 
 with tabs[5]:
     st.subheader("Match History / Performance Logs")
@@ -1230,6 +1231,7 @@ with action_cols[0]:
         ok, path = save_unique_json(SNAP_DIR, profile, "manual_snapshot", "snapshot")
         if ok:
             st.success(f"Snapshot saved: {path}")
+            st.toast("Snapshot saved.", icon="?")
         else:
             st.info(f"Duplicate snapshot skipped: {path}")
 
@@ -1252,6 +1254,7 @@ with action_cols[3]:
     if st.button("Save Now", use_container_width=True):
         safe_save_json(AUTOSAVE_PATH, profile)
         st.success("Profile autosaved.")
+        st.toast("Profile autosaved.", icon="?")
 
 
 # ============== Autosave ==============
