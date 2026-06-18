@@ -11,3 +11,7 @@ smoke_test.py
 apex_dashboard_source.zip
 profile_autosave.json
 .streamlit/secrets.toml
+requirements.clean.txt
+requirements.before-security-clean.txt
+local-freeze.txt
+pip-freeze.txt
