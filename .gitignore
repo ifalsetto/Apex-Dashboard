@@ -10,3 +10,4 @@ smoke_test.py
 .DS_Store
 apex_dashboard_source.zip
 profile_autosave.json
+.streamlit/secrets.toml
