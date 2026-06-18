@@ -10,13 +10,13 @@ import streamlit as st
 
 logger = logging.getLogger("apex_dashboard")
 
-TRACKER_SEARCH_URL = "https://public-api.tracker.gg/v2/apex/standard/profile/{platform}/{player}"
-VALID_PLATFORMS = {"pc", "psn", "xbl"}
+TRACKER_PROFILE_URL = "https://public-api.tracker.gg/v2/apex/standard/profile/{platform}/{player}"
+VALID_PLATFORMS = {"origin", "psn", "xbl"}
 
 
 def normalize_platform(platform: str | None) -> str:
-    value = str(platform or "pc").strip().lower()
-    return value if value in VALID_PLATFORMS else "pc"
+    value = str(platform or "origin").strip().lower()
+    return value if value in VALID_PLATFORMS else "origin"
 
 
 def get_tracker_api_key() -> Optional[str]:
@@ -159,7 +159,7 @@ def normalize_tracker_profile(payload: Dict[str, Any], *, query: str, platform: 
     }
 
 
-def tracker_fallback_profile(*, query: str = "Apex Player", platform: str = "pc", error: str = "") -> Dict[str, Any]:
+def tracker_fallback_profile(*, query: str = "Apex Player", platform: str = "origin", error: str = "") -> Dict[str, Any]:
     return {
         "ok": False,
         "source": "fallback",
@@ -193,7 +193,7 @@ def fetch_tracker_profile(query: str, platform: str) -> Dict[str, Any]:
 
     try:
         response = requests.get(
-            TRACKER_SEARCH_URL.format(platform=clean_platform, player=clean_query),
+            TRACKER_PROFILE_URL.format(platform=clean_platform, player=clean_query),
             headers={"TRN-Api-Key": api_key, "Accept": "application/json"},
             timeout=15,
         )

@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Dict, Any, Tuple, List, Optional
 from streamlit_autorefresh import st_autorefresh
 import streamlit as st
+from apex_api_status import render_api_status_panel
 
 # Import refactored modules
 from apex_config import config, Config
@@ -793,7 +794,6 @@ def ocr_detect_end_screen_demo() -> Dict[str, Any]:
         import pytesseract
         import mss
         from PIL import Image
-from apex_api_status import render_api_status_panel
 
         keywords = ["CHAMPION", "SQUAD ELIMINATED", "MATCH SUMMARY", "YOU ARE THE CHAMPION", "ELIMINATED"]
         with mss.mss() as sct:
@@ -919,9 +919,340 @@ st.caption(
     f"Updated: {profile['meta']['lastUpdatedISO']}"
 )
 
-# ... rest of UI code follows same structure as original ...
-# (Due to token limits, showing main improvements above)
-# The rest would include all tab implementations with the same logic
+
+# ============== Dashboard Body ==============
+
+profile.setdefault("meta", {})
+profile.setdefault("targets", {})
+profile.setdefault("toggles", {})
+profile.setdefault("launchOptions", [])
+profile.setdefault("performanceLogs", [])
+profile.setdefault("network", {})
+profile.setdefault("hdrSetup", DEFAULT_PROFILE.get("hdrSetup", {}))
+profile.setdefault("presets", DEFAULT_PROFILE.get("presets", {}))
+
+top_a, top_b, top_c, top_d = st.columns(4)
+top_a.metric("Refresh Target", f"{profile['targets'].get('refreshHz', '?')} Hz")
+top_b.metric("FPS Target", profile["targets"].get("fpsTarget", "?"))
+top_c.metric("Latency Goal", f"{profile['targets'].get('latencyGoalMs', '?')} ms")
+top_d.metric("HDR Mode", hdr_method_label(profile.get("toggles", {})))
+
+tabs = st.tabs([
+    UI["tabs"]["apex"],
+    "Tracker",
+    UI["tabs"]["hdr"],
+    UI["tabs"]["presets"],
+    UI["tabs"]["match"],
+    UI["tabs"]["perf"],
+    UI["tabs"]["net"],
+    UI["tabs"]["storage"],
+    UI["tabs"]["library"],
+])
+
+with tabs[0]:
+    st.subheader("Competitive Setup")
+
+    left, right = st.columns([1, 1])
+
+    with left:
+        profile["meta"]["profileName"] = st.text_input(
+            UI["labels"]["profile_name"],
+            value=str(profile["meta"].get("profileName", "")),
+        )
+        profile["meta"]["monitor"] = st.text_input(
+            "Monitor",
+            value=str(profile["meta"].get("monitor", "")),
+        )
+        profile["meta"]["gpu"] = st.text_input(
+            "GPU",
+            value=str(profile["meta"].get("gpu", "")),
+        )
+        profile["meta"]["notes"] = st.text_area(
+            UI["labels"]["notes"],
+            value=str(profile["meta"].get("notes", "")),
+            height=110,
+        )
+
+    with right:
+        refresh = st.number_input(
+            UI["labels"]["refresh"],
+            min_value=30,
+            max_value=360,
+            value=safe_int(profile["targets"].get("refreshHz", 240), 240, 30, 360),
+            step=1,
+        )
+        profile["targets"]["refreshHz"] = validate_refresh_hz(int(refresh))
+
+        fps_target = st.number_input(
+            UI["labels"]["fps_target"],
+            min_value=30,
+            max_value=500,
+            value=safe_int(profile["targets"].get("fpsTarget", 237), 237, 30, 500),
+            step=1,
+        )
+        profile["targets"]["fpsTarget"] = validate_fps_target(int(fps_target), int(refresh))
+
+        latency_goal = st.number_input(
+            UI["labels"]["latency"],
+            min_value=1,
+            max_value=100,
+            value=safe_int(profile["targets"].get("latencyGoalMs", 10), 10, 1, 100),
+            step=1,
+        )
+        profile["targets"]["latencyGoalMs"] = int(latency_goal)
+
+    st.divider()
+    st.subheader(UI["labels"]["launch"])
+
+    for i, opt in enumerate(profile.get("launchOptions", [])):
+        if not isinstance(opt, dict):
+            continue
+        cols = st.columns([1, 2, 4])
+        with cols[0]:
+            opt["enabled"] = st.checkbox("On", value=bool(opt.get("enabled")), key=f"launch_enabled_{i}")
+        with cols[1]:
+            opt["key"] = st.text_input("Flag", value=str(opt.get("key", "")), key=f"launch_key_{i}")
+        with cols[2]:
+            opt["note"] = st.text_input("Note", value=str(opt.get("note", "")), key=f"launch_note_{i}")
+
+    st.code(build_launch_string(profile.get("launchOptions", [])), language="text")
+
+    if st.button("Add launch option"):
+        profile["launchOptions"].append({"key": "", "enabled": False, "note": ""})
+        st.rerun()
+
+with tabs[1]:
+    st.subheader("Tracker.gg Player Lookup")
+
+    try:
+        from apex_tracker import fetch_tracker_profile
+    except Exception as exc:
+        fetch_tracker_profile = None
+        st.error(f"Tracker module unavailable: {exc}")
+
+    tracker_cols = st.columns([1, 2, 1])
+    with tracker_cols[0]:
+        tracker_platform = st.selectbox("Platform", ["origin", "xbl", "psn"], index=0)
+    with tracker_cols[1]:
+        tracker_player = st.text_input("Player handle", value=st.session_state.get("tracker_player", "ifalsetto"))
+    with tracker_cols[2]:
+        st.write("")
+        st.write("")
+        search_tracker = st.button("Search Tracker", use_container_width=True)
+
+    if search_tracker and fetch_tracker_profile:
+        st.session_state.tracker_player = tracker_player
+        with st.spinner("Fetching Tracker profile..."):
+            st.session_state.tracker_profile = fetch_tracker_profile(tracker_player, tracker_platform)
+
+    tracker_profile = st.session_state.get("tracker_profile")
+    if tracker_profile:
+        if tracker_profile.get("source") == "fallback":
+            st.warning(tracker_profile.get("error", "Tracker fallback data is active."))
+        else:
+            st.success("Tracker profile loaded.")
+
+        stat_cols = st.columns(6)
+        stat_cols[0].metric("Player", tracker_profile.get("player_name", "?"))
+        stat_cols[1].metric("Level", tracker_profile.get("level", "?"))
+        stat_cols[2].metric("Rank", tracker_profile.get("rank", "?"))
+        stat_cols[3].metric("Kills", tracker_profile.get("kills", "?"))
+        stat_cols[4].metric("Wins", tracker_profile.get("wins", "?"))
+        stat_cols[5].metric("K/D", tracker_profile.get("kd", "?"))
+
+        st.metric("Current Legend", tracker_profile.get("current_legend", "?"))
+
+        with st.expander("Raw Tracker payload", expanded=False):
+            st.json(tracker_profile.get("raw", {}))
+    else:
+        st.info("Search a player to load Tracker stats. If the API key is missing/invalid, fallback mode stays active.")
+
+with tabs[2]:
+    st.subheader("HDR / Display Guide")
+
+    toggles = profile.setdefault("toggles", {})
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        toggles["hdrWindowsOn"] = st.checkbox("Windows HDR", value=bool(toggles.get("hdrWindowsOn", True)))
+        toggles["autoHdrOn"] = st.checkbox("Auto HDR", value=bool(toggles.get("autoHdrOn", True)))
+    with col2:
+        toggles["rtxHdrOn"] = st.checkbox("RTX HDR", value=bool(toggles.get("rtxHdrOn", False)))
+        toggles["gsyncOn"] = st.checkbox("G-SYNC", value=bool(toggles.get("gsyncOn", True)))
+    with col3:
+        toggles["vsyncInGameOff"] = st.checkbox("In-game V-Sync OFF", value=bool(toggles.get("vsyncInGameOff", True)))
+        toggles["reflexBoostOn"] = st.checkbox("NVIDIA Reflex + Boost", value=bool(toggles.get("reflexBoostOn", True)))
+
+    hdr_setup = profile.get("hdrSetup", {})
+    for section, steps in hdr_setup.items():
+        with st.expander(str(section).title(), expanded=False):
+            if isinstance(steps, list):
+                for step in steps:
+                    st.write(f"- {step}")
+            else:
+                st.write(steps)
+
+with tabs[3]:
+    st.subheader("Presets")
+
+    presets = profile.get("presets", {})
+    if presets:
+        selected_preset = st.selectbox("Preset", list(presets.keys()))
+        st.json(presets.get(selected_preset, {}))
+    else:
+        st.info("No presets found.")
+
+with tabs[4]:
+    st.subheader("Auto Match Log")
+
+    with st.form("manual_match_log"):
+        match_cols = st.columns(4)
+        mode = match_cols[0].text_input("Mode", value="Ranked")
+        map_name = match_cols[1].text_input("Map", value="")
+        avg_fps = match_cols[2].number_input("Avg FPS", min_value=0, max_value=500, value=0)
+        ping_ms = match_cols[3].number_input("Ping ms", min_value=0, max_value=500, value=0)
+
+        notes = st.text_area("Match notes", height=90)
+        submitted = st.form_submit_button("Add Match Log")
+
+    if submitted:
+        profile.setdefault("performanceLogs", []).append({
+            "createdISO": now_iso(),
+            "mode": mode,
+            "map": map_name,
+            "avg_fps": avg_fps,
+            "ping_ms": ping_ms,
+            "notes": notes,
+            "settings_signature": profile_hash(profile),
+        })
+        st.success("Match log added.")
+
+with tabs[5]:
+    st.subheader("Match History / Performance Logs")
+
+    logs = profile.get("performanceLogs", [])
+    if logs:
+        st.dataframe(logs, use_container_width=True)
+        st.download_button(
+            "Download logs CSV",
+            data=logs_to_csv_bytes(logs),
+            file_name="apex_performance_logs.csv",
+            mime="text/csv",
+            use_container_width=True,
+        )
+    else:
+        st.info("No performance logs yet.")
+
+with tabs[6]:
+    st.subheader("Network")
+
+    network = profile.setdefault("network", {})
+    left, right = st.columns(2)
+
+    with left:
+        network["connection"] = st.text_input("Connection", value=str(network.get("connection", "Ethernet")))
+        network["isp"] = st.text_input("ISP", value=str(network.get("isp", "")))
+        network["router_model"] = st.text_input("Router model", value=str(network.get("router_model", "")))
+        network["modem_model"] = st.text_input("Modem / fiber box", value=str(network.get("modem_model", "")))
+
+    with right:
+        tests = network.setdefault("tests", {})
+        tests["speedtest_down_mbps"] = st.text_input("Download Mbps", value=str(tests.get("speedtest_down_mbps", "")))
+        tests["speedtest_up_mbps"] = st.text_input("Upload Mbps", value=str(tests.get("speedtest_up_mbps", "")))
+        tests["speedtest_ping_ms"] = st.text_input("Ping ms", value=str(tests.get("speedtest_ping_ms", "")))
+        tests["packet_loss_pct"] = st.text_input("Packet loss %", value=str(tests.get("packet_loss_pct", "")))
+
+    network["notes"] = st.text_area("Network notes", value=str(network.get("notes", "")), height=100)
+
+with tabs[7]:
+    st.subheader("Storage Audit")
+
+    storage_targets = [
+        ("Snapshots", SNAP_DIR),
+        ("Scans", SCAN_DIR),
+        ("Exports", EXPORT_DIR),
+        ("Profiles", PROFILES_DIR),
+        ("TempBin", TEMPBIN_DIR),
+        ("Trash", TRASHBIN_DIR),
+        ("StorageMap", STORAGE_DIR),
+    ]
+
+    rows = []
+    for label, folder in storage_targets:
+        path_obj = Path(folder)
+        total_bytes = 0
+        file_count = 0
+
+        if path_obj.exists():
+            for item in path_obj.rglob("*"):
+                try:
+                    if item.is_file():
+                        file_count += 1
+                        total_bytes += item.stat().st_size
+                except Exception:
+                    pass
+
+        rows.append({
+            "Label": label,
+            "Path": str(path_obj),
+            "Exists": path_obj.exists(),
+            "Files": file_count,
+            "Size": bytes_human(total_bytes),
+        })
+
+    st.dataframe(rows, use_container_width=True)
+
+with tabs[8]:
+    st.subheader("Help Library")
+
+    library_type = st.radio("Library", ["Settings", "Launch Options"], horizontal=True)
+
+    if library_type == "Settings":
+        keys = list(SETTING_LIBRARY.keys())
+        if keys:
+            selected = st.selectbox("Setting", keys)
+            st.json(SETTING_LIBRARY[selected])
+        else:
+            st.info("No setting library entries yet.")
+    else:
+        keys = list(LAUNCH_OPTION_LIBRARY.keys())
+        if keys:
+            selected = st.selectbox("Launch option", keys)
+            st.json(LAUNCH_OPTION_LIBRARY[selected])
+        else:
+            st.info("No launch option library entries yet.")
+
+st.divider()
+
+action_cols = st.columns(4)
+
+with action_cols[0]:
+    if st.button(UI["buttons"]["snapshot"], use_container_width=True):
+        ok, path = save_unique_json(SNAP_DIR, profile, "manual_snapshot", "snapshot")
+        if ok:
+            st.success(f"Snapshot saved: {path}")
+        else:
+            st.info(f"Duplicate snapshot skipped: {path}")
+
+with action_cols[1]:
+    st.download_button(
+        UI["buttons"]["export"],
+        data=json.dumps(profile, indent=2, ensure_ascii=False).encode("utf-8"),
+        file_name=f"{slug(profile['meta'].get('profileName', 'apex_profile'))}.json",
+        mime="application/json",
+        use_container_width=True,
+    )
+
+with action_cols[2]:
+    if st.button(UI["buttons"]["reset"], use_container_width=True):
+        st.session_state.profile = deep_copy(DEFAULT_PROFILE)
+        st.warning("Profile reset to defaults.")
+        st.rerun()
+
+with action_cols[3]:
+    if st.button("Save Now", use_container_width=True):
+        safe_save_json(AUTOSAVE_PATH, profile)
+        st.success("Profile autosaved.")
+
 
 # ============== Autosave ==============
 profile = bump_updated(profile)

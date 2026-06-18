@@ -153,7 +153,7 @@ def build_apex_coach_context(profile: Mapping[str, Any], user_goal: str) -> Dict
 
 
 def get_openai_api_key(streamlit_secrets: Optional[Mapping[str, Any]] = None) -> str:
-    if streamlit_secrets:
+    if streamlit_secrets is not None:
         try:
             value = streamlit_secrets.get("OPENAI_API_KEY", "")
             if value:
