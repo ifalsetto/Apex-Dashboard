@@ -1,6 +1,6 @@
 """Apex Optimizer Dashboard - Refactored main application."""
-                    import json
-                    import os
+import json
+import os
 import csv
 import hashlib
 import datetime as dt
@@ -720,8 +720,8 @@ def dir_stats(root: str, max_files: int = 25000) -> Dict[str, Any]:
                     m = dt.datetime.fromtimestamp(stt.st_mtime).isoformat(timespec="seconds")
                     if not newest_iso or m > newest_iso:
                         newest_iso = m
-                    if not oldest_iso or m < oldest_iso:
-                        oldest_iso = m
+                        if not oldest_iso or m < oldest_iso:
+                            oldest_iso = m
                 except Exception as e:
                     logger.debug(f"Failed to stat {fp}: {e}")
             if truncated:
