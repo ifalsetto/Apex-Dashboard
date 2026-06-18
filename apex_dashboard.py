@@ -46,7 +46,6 @@ APP_VERSION = config.APP_VERSION
 REPO_URL = config.REPO_URL
 BUG_URL = f"{REPO_URL}/issues/new?template=bug_report.yml"
 FEATURE_URL = f"{REPO_URL}/issues/new?template=feature_request.yml"
-LIVE_APP_URL = "https://apex-dashboard-beta.streamlit.app/"
 
 # Path variables for backward compatibility
 BASE_DIR = str(config.BASE_DIR)
@@ -920,8 +919,6 @@ def render_system_health_panel(profile: Dict[str, Any]) -> None:
             st.warning("OPENAI_API_KEY missing in Streamlit Secrets.")
         if not tracker_ready:
             st.warning("TRACKER_API_KEY missing or blank in Streamlit Secrets.")
-
-        st.link_button("Open Live App", LIVE_APP_URL, use_container_width=True)
         st.link_button("Open GitHub Repo", REPO_URL, use_container_width=True)
 
 
@@ -944,7 +941,6 @@ with st.sidebar:
     st.caption(f"Version: {APP_VERSION}")
     st.markdown("---")
     st.markdown("**Official Links**")
-    st.link_button("Live Dashboard", LIVE_APP_URL, use_container_width=True)
     st.link_button("GitHub Repo", REPO_URL, use_container_width=True)
     st.link_button("Report a bug", BUG_URL, use_container_width=True)
     st.link_button("Request a feature", FEATURE_URL, use_container_width=True)
