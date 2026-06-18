@@ -1029,6 +1029,37 @@ tabs = st.tabs([
 with tabs[0]:
     st.subheader("Competitive Setup")
 
+    st.info(
+        "Local one-click import works when this dashboard is running on your Windows PC. "
+        "The live Streamlit Cloud app cannot directly read your computer.",
+    )
+
+    try:
+        from apex_local_importer import (
+            apply_setup_settings_to_profile,
+            collect_local_setup_settings,
+        )
+    except Exception as exc:
+        st.warning(f"Local setup importer unavailable: {exc}")
+    else:
+        if st.button("Import Local PC / Display Settings", use_container_width=True):
+            result = collect_local_setup_settings()
+
+            if not result.get("ok"):
+                st.warning(result.get("error", "Local setup import failed."))
+            else:
+                imported_setup = result.get("data", {})
+                st.session_state.last_local_setup_import = imported_setup
+                st.session_state.profile = apply_setup_settings_to_profile(profile, imported_setup)
+                st.success("Local PC/display settings imported.")
+                st.toast("Setup imported.")
+                st.rerun()
+
+        if st.session_state.get("last_local_setup_import"):
+            with st.expander("Last imported setup data", expanded=False):
+                st.json(st.session_state.last_local_setup_import)
+
+
     left, right = st.columns([1, 1])
 
     with left:
@@ -1308,6 +1339,43 @@ with tabs[5]:
 
 with tabs[6]:
     st.subheader("Network")
+
+    st.info(
+        "Local one-click import works when this dashboard is running on your Windows PC. "
+        "The live Streamlit Cloud app cannot directly read your network adapter settings.",
+    )
+
+    try:
+        from apex_local_importer import (
+            apply_network_settings_to_profile,
+            collect_local_network_settings,
+        )
+    except Exception as exc:
+        st.warning(f"Local network importer unavailable: {exc}")
+    else:
+        redact_network_ids = st.checkbox(
+            "Redact local IPv4/MAC values",
+            value=True,
+            key="redact_local_network_ids",
+        )
+
+        if st.button("Import Local Network Settings", use_container_width=True):
+            result = collect_local_network_settings(redact_local_ids=redact_network_ids)
+
+            if not result.get("ok"):
+                st.warning(result.get("error", "Local network import failed."))
+            else:
+                imported_network = result.get("data", {})
+                st.session_state.last_local_network_import = imported_network
+                st.session_state.profile = apply_network_settings_to_profile(profile, imported_network)
+                st.success("Local network settings imported.")
+                st.toast("Network imported.")
+                st.rerun()
+
+        if st.session_state.get("last_local_network_import"):
+            with st.expander("Last imported network data", expanded=False):
+                st.json(st.session_state.last_local_network_import)
+
 
     network = profile.setdefault("network", {})
     left, right = st.columns(2)
