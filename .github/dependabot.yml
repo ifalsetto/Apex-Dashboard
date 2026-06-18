@@ -1,42 +1,11 @@
-version: 2
-
+﻿version: 2
 updates:
-
-* package-ecosystem: "pip"
-  directory: "/"
-  schedule:
-  interval: "weekly"
-  day: "monday"
-  time: "06:00"
-  timezone: "America/Chicago"
-  open-pull-requests-limit: 5
-  labels:
-
-  * "dependencies"
-  * "security"
-  * "python"
-    commit-message:
-    prefix: "deps"
-    include: "scope"
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
     groups:
-    python-dependencies:
-    patterns:
-
-    * "*"
-
-* package-ecosystem: "github-actions"
-  directory: "/"
-  schedule:
-  interval: "weekly"
-  day: "monday"
-  time: "06:30"
-  timezone: "America/Chicago"
-  open-pull-requests-limit: 5
-  labels:
-
-  * "dependencies"
-  * "security"
-  * "github-actions"
-    commit-message:
-    prefix: "deps"
-    include: "scope"
+      python-dependencies:
+        patterns:
+          - "*"
