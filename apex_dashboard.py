@@ -1098,6 +1098,92 @@ with tabs[0]:
         profile["launchOptions"].append({"key": "", "enabled": False, "note": ""})
         st.rerun()
 
+    st.divider()
+    st.subheader("Import System Report")
+    st.caption("Upload a DxDiag .txt report to import safe system, display, GPU, and driver information.")
+
+    try:
+        from apex_system_importer import (
+            LOCAL_DXDIAG_HELPER_PS1,
+            apply_system_report_to_profile,
+            build_import_rows,
+            parse_dxdiag_text,
+        )
+    except Exception as exc:
+        st.error(f"System report importer unavailable: {exc}")
+    else:
+        with st.expander("How to create a DxDiag report", expanded=False):
+            st.write("Run this on your Windows gaming PC, then upload the created text file here.")
+            st.code('dxdiag /t "$env:USERPROFILE\\Desktop\\dxdiag_apex.txt"', language="powershell")
+            st.download_button(
+                "Download local DxDiag helper script",
+                data=LOCAL_DXDIAG_HELPER_PS1.encode("utf-8"),
+                file_name="generate_dxdiag_apex.ps1",
+                mime="text/plain",
+                use_container_width=True,
+            )
+
+        uploaded_dxdiag = st.file_uploader(
+            "Upload DxDiag report (.txt)",
+            type=["txt"],
+            key="dxdiag_report_upload",
+        )
+
+        if uploaded_dxdiag is not None:
+            raw_dxdiag = uploaded_dxdiag.getvalue().decode("utf-8", errors="replace")
+            parsed_dxdiag = parse_dxdiag_text(raw_dxdiag)
+            import_rows = build_import_rows(parsed_dxdiag)
+
+            if not import_rows:
+                st.warning("No supported DxDiag fields were found. Make sure you uploaded the full DxDiag text report.")
+            else:
+                st.success(f"Found {len(import_rows)} supported fields.")
+                st.dataframe(
+                    [
+                        {
+                            "Field": row["Field"],
+                            "Value": row["Value"],
+                            "Destination": row["Destination"],
+                            "Recommended": row["Recommended"],
+                        }
+                        for row in import_rows
+                    ],
+                    use_container_width=True,
+                    hide_index=True,
+                )
+
+                with st.form("apply_dxdiag_import"):
+                    st.write("Choose what to import into your profile.")
+
+                    selected_import_keys = []
+                    for row in import_rows:
+                        selected = st.checkbox(
+                            f'{row["Field"]} ? {row["Destination"]}',
+                            value=bool(row["Recommended"]),
+                            key=f'dxdiag_import_{row["key"]}',
+                        )
+                        if selected:
+                            selected_import_keys.append(row["key"])
+
+                    apply_import = st.form_submit_button("Apply selected system info")
+
+                if apply_import:
+                    if not selected_import_keys:
+                        st.warning("No fields selected.")
+                    else:
+                        st.session_state.profile = apply_system_report_to_profile(
+                            profile,
+                            parsed_dxdiag,
+                            selected_import_keys,
+                        )
+                        st.success(f"Imported {len(selected_import_keys)} fields into profile.")
+                        st.toast("System report imported.")
+                        st.rerun()
+
+                with st.expander("Parsed safe fields", expanded=False):
+                    st.json(parsed_dxdiag)
+
+
 with tabs[1]:
     st.subheader("Tracker.gg Player Lookup")
 
