@@ -1,0 +1,63 @@
+:root {
+  --ft-bg: #09080f;
+  --ft-card: rgba(255, 255, 255, 0.06);
+  --ft-card-strong: rgba(255, 255, 255, 0.1);
+  --ft-border: rgba(255, 255, 255, 0.14);
+  --ft-text: #f8fafc;
+  --ft-muted: rgba(248, 250, 252, 0.74);
+  --ft-purple: #7c3aed;
+  --ft-purple-light: #a78bfa;
+  --ft-silver: #cbd5e1;
+}
+
+.ft-ai-hero {
+  border: 1px solid var(--ft-border);
+  border-radius: 24px;
+  padding: clamp(1.25rem, 3vw, 2.25rem);
+  margin-bottom: 1.25rem;
+  background:
+    radial-gradient(circle at top left, rgba(124, 58, 237, 0.38), transparent 34%),
+    linear-gradient(135deg, rgba(148, 163, 184, 0.12), rgba(15, 23, 42, 0.48));
+  box-shadow: 0 22px 60px rgba(0, 0, 0, 0.22);
+}
+
+.ft-ai-eyebrow {
+  color: var(--ft-purple-light);
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  margin: 0 0 0.5rem;
+  text-transform: uppercase;
+}
+
+.ft-ai-title {
+  color: var(--ft-text);
+  font-size: clamp(2rem, 5vw, 3.75rem);
+  line-height: 0.96;
+  margin: 0;
+}
+
+.ft-ai-lede {
+  color: var(--ft-muted);
+  font-size: clamp(1rem, 2vw, 1.12rem);
+  line-height: 1.65;
+  max-width: 72rem;
+  margin: 1rem 0 0;
+}
+
+[data-testid="stMetric"] {
+  background: var(--ft-card);
+  border: 1px solid var(--ft-border);
+  border-radius: 18px;
+  padding: 1rem;
+}
+
+.stButton > button {
+  border-radius: 14px;
+  font-weight: 800;
+}
+
+textarea,
+input {
+  border-radius: 12px !important;
+}

@@ -1,0 +1,35 @@
+name: Bug report
+description: Report a bug in Apex Dashboard
+title: "[BUG] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for testing the beta. Please fill this out.
+  - type: input
+    id: version
+    attributes:
+      label: App version
+      description: e.g. v0.1.0-beta
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: What actually happened
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs / screenshots (optional)
+      required: false
