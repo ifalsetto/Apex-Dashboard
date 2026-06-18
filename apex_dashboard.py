@@ -1300,27 +1300,32 @@ with tabs[4]:
 
     st.subheader("Live Apex Monitor")
     st.caption(
-        "Local mode only. This watches for Apex Legends running on your Windows PC and keeps updating until Apex closes or this Streamlit app closes."
+        "Local mode only. This watches Apex Legends on your Windows PC, auto-links when Apex runs, starts monitoring when Apex becomes active, and ends/logs when Apex closes or goes inactive long enough."
     )
 
     monitor = st.session_state.monitor_state
-    monitor.setdefault("enabled", False)
+    monitor.setdefault("enabled", True)
+    monitor.setdefault("auto_match_detection", True)
     monitor.setdefault("poll_seconds", 3)
+    monitor.setdefault("start_streak_needed", 3)
+    monitor.setdefault("end_streak_needed", 6)
     monitor.setdefault("last_logged_match_endISO", "")
-    monitor.setdefault("last_status", "Idle")
+    monitor.setdefault("last_status", "Auto-detect armed")
 
     control_cols = st.columns(4)
 
     with control_cols[0]:
-        if st.button("Start Live Monitor", width="stretch"):
+        if st.button("Arm Auto Monitor", width="stretch"):
             monitor["enabled"] = True
-            monitor["last_status"] = "Monitoring started"
+            monitor["auto_match_detection"] = True
+            monitor["last_status"] = "Auto-detect armed"
             st.session_state.monitor_state = monitor
             st.rerun()
 
     with control_cols[1]:
         if st.button("Stop Monitor", width="stretch"):
             monitor["enabled"] = False
+            monitor["auto_match_detection"] = False
             monitor["last_status"] = "Monitoring stopped"
             st.session_state.monitor_state = monitor
             st.rerun()
@@ -1336,12 +1341,16 @@ with tabs[4]:
         )
 
     with control_cols[3]:
-        ocr_next = st.checkbox(
-            "OCR later",
-            value=False,
-            disabled=True,
-            help="Optional future upgrade for reading end screens / match result screens.",
+        monitor["auto_match_detection"] = st.checkbox(
+            "Auto-detect matches",
+            value=bool(monitor.get("auto_match_detection", True)),
+            help="When enabled, the app keeps watching for Apex and auto-starts/ends session monitoring.",
+            key="auto_detect_apex_matches",
         )
+
+    if monitor.get("auto_match_detection"):
+        monitor["enabled"] = True
+        monitor["last_status"] = "Auto-detect armed"
 
     if monitor.get("enabled"):
         st_autorefresh(
@@ -1367,7 +1376,7 @@ with tabs[4]:
     status_cols[1].metric("Apex", "Running" if apex_running else "Closed")
     status_cols[2].metric("Linked", "Yes" if linked else "No")
     status_cols[3].metric("Foreground", "Yes" if apex_foreground else "No")
-    status_cols[4].metric("Game Session", "Active" if in_match else "Waiting")
+    status_cols[4].metric("Match Monitor", "Active" if in_match else "Waiting")
 
     sample_cols = st.columns(4)
     sample_cols[0].metric("CPU Peak", f'{float(monitor.get("cpu_peak", 0.0)):.2f}%')
@@ -1381,6 +1390,12 @@ with tabs[4]:
         st.write(f'Match/session start: `{monitor.get("match_startISO", "")}`')
         st.write(f'Match/session end: `{monitor.get("match_endISO", "")}`')
         st.write(f'Status: `{monitor.get("last_status", "Idle")}`')
+
+    with st.expander("OCR upgrade path", expanded=False):
+        st.write("OCR is not required for the first auto monitor. Add OCR later if we need stronger match-start/end confirmation.")
+        st.write("- Start signals: ROUND 1, CHAMPION SQUAD, DROPSHIP, SQUADS LEFT")
+        st.write("- End signals: SQUAD ELIMINATED, YOU ARE THE CHAMPION, MATCH SUMMARY, DEATH RECAP")
+        st.write("OCR should use screen capture only. No game memory reading, no input automation, no game file changes.")
 
     ended_match = (
         bool(monitor.get("match_endISO"))
