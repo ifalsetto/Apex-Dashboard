@@ -37,3 +37,7 @@ requirements.before-security-clean.txt
 .streamlit/secrets.toml.*
 .env
 *.env
+.streamlit/secrets.toml
+.streamlit/secrets.toml.*
+.env
+*.env
