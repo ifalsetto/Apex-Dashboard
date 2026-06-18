@@ -19,7 +19,16 @@ class Config:
     FEATURE_URL: str = field(default_factory=lambda: f"{Config.REPO_URL}/issues/new?template=feature_request.yml")
 
     # Process names
-    APEX_PROCESS_NAMES: list = field(default_factory=lambda: ["r5apex", "r5apex.exe"])
+    # Process-only detection is intentionally read-only. It checks whether the
+    # local Windows process list contains Apex Legends and does not inspect game
+    # memory, automate input, modify files, or interact with anti-cheat systems.
+    APEX_PROCESS_NAMES: list = field(default_factory=lambda: [
+        "r5apex",
+        "r5apex.exe",
+        "r5apex_dx12",
+        "r5apex_dx12.exe",
+    ])
+    APEX_PROCESS_PREFIXES: list = field(default_factory=lambda: ["r5apex"])
 
     # Base directory
     BASE_DIR: Path = field(default_factory=lambda: Path(__file__).parent)
