@@ -862,7 +862,18 @@ def parse_presentmon_csv(file_bytes: bytes) -> Dict[str, Any]:
 # ============== STREAMLIT UI ==============
 st.set_page_config(page_title=APP_TITLE, layout="wide")
 
+# FALSETECH_THEME_START
+THEME_CSS_PATH = Path(BASE_DIR) / "assets" / "falsetech_theme.css"
+if THEME_CSS_PATH.exists():
+    st.markdown(f"<style>{THEME_CSS_PATH.read_text(encoding='utf-8')}</style>", unsafe_allow_html=True)
+# FALSETECH_THEME_END
+
+
 with st.sidebar:
+    st.markdown(
+        '<div class="ft-brand-pill"><span class="ft-brand-dot"></span>FalseTech Apex</div>',
+        unsafe_allow_html=True,
+    )
     st.markdown("### Apex Dashboard")
     st.caption(f"Version: {APP_VERSION}")
     st.link_button("Report a bug", BUG_URL, use_container_width=True)
