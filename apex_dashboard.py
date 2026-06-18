@@ -46,6 +46,7 @@ APP_VERSION = config.APP_VERSION
 REPO_URL = config.REPO_URL
 BUG_URL = f"{REPO_URL}/issues/new?template=bug_report.yml"
 FEATURE_URL = f"{REPO_URL}/issues/new?template=feature_request.yml"
+LIVE_APP_URL = "https://apex-dashboard-beta.streamlit.app/"
 
 # Path variables for backward compatibility
 BASE_DIR = str(config.BASE_DIR)
@@ -859,6 +860,71 @@ def parse_presentmon_csv(file_bytes: bytes) -> Dict[str, Any]:
         return {"ok": False, "error": str(e)}
 
 
+
+# -------------------- System Health --------------------
+def runtime_secret_available(name: str) -> bool:
+    """Check whether a runtime secret/env var exists without exposing the value."""
+    try:
+        value = st.secrets.get(name, "")
+    except Exception:
+        value = os.environ.get(name, "")
+    return bool(str(value).strip())
+
+
+def bool_status(value: bool) -> str:
+    """Readable status label."""
+    return "Ready" if value else "Missing"
+
+
+def render_system_health_panel(profile: Dict[str, Any]) -> None:
+    """Render a compact system health panel in the sidebar."""
+    with st.expander("System Health", expanded=True):
+        st.caption("Live app status, secrets, storage, and profile state.")
+
+        app_col, version_col = st.columns(2)
+        app_col.metric("App", "Live")
+        version_col.metric("Version", APP_VERSION)
+
+        secret_col_a, secret_col_b = st.columns(2)
+        openai_ready = runtime_secret_available("OPENAI_API_KEY")
+        tracker_ready = runtime_secret_available("TRACKER_API_KEY")
+
+        secret_col_a.metric("OpenAI", bool_status(openai_ready))
+        secret_col_b.metric("Tracker", bool_status(tracker_ready))
+
+        profile_meta = profile.get("meta", {}) if isinstance(profile, dict) else {}
+        profile_logs = profile.get("performanceLogs", []) if isinstance(profile, dict) else []
+
+        st.write("**Profile**")
+        st.caption(f"Name: {profile_meta.get('profileName', 'Unknown')}")
+        st.caption(f"Updated: {profile_meta.get('lastUpdatedISO', 'Unknown')}")
+        st.caption(f"Match logs: {len(profile_logs) if isinstance(profile_logs, list) else 0}")
+
+        storage_rows = []
+        for label, folder in [
+            ("Autosave", Path(AUTOSAVE_PATH).parent),
+            ("Snapshots", Path(SNAP_DIR)),
+            ("Exports", Path(EXPORT_DIR)),
+            ("Profiles", Path(PROFILES_DIR)),
+            ("Storage", Path(STORAGE_DIR)),
+        ]:
+            storage_rows.append({
+                "Area": label,
+                "Ready": folder.exists(),
+            })
+
+        st.write("**Storage**")
+        st.dataframe(storage_rows, use_container_width=True, hide_index=True)
+
+        if not openai_ready:
+            st.warning("OPENAI_API_KEY missing in Streamlit Secrets.")
+        if not tracker_ready:
+            st.warning("TRACKER_API_KEY missing or blank in Streamlit Secrets.")
+
+        st.link_button("Open Live App", LIVE_APP_URL, use_container_width=True)
+        st.link_button("Open GitHub Repo", REPO_URL, use_container_width=True)
+
+
 # ============== STREAMLIT UI ==============
 st.set_page_config(page_title=APP_TITLE, layout="wide")
 
@@ -876,11 +942,12 @@ with st.sidebar:
     )
     st.markdown("### Apex Dashboard")
     st.caption(f"Version: {APP_VERSION}")
+    st.markdown("---")
+    st.markdown("**Official Links**")
+    st.link_button("Live Dashboard", LIVE_APP_URL, use_container_width=True)
+    st.link_button("GitHub Repo", REPO_URL, use_container_width=True)
     st.link_button("Report a bug", BUG_URL, use_container_width=True)
     st.link_button("Request a feature", FEATURE_URL, use_container_width=True)
-    st.markdown("---")
-    st.markdown("**Repo**")
-    st.markdown(f"[Apex-Dashboard]({REPO_URL})")
 
 st.info("Beta: reproduce once → click Report a bug → paste steps + screenshot.", icon="🧪")
 
@@ -916,6 +983,9 @@ if "storage_map" not in st.session_state:
     st.session_state.storage_map = safe_load_json(STORAGE_MAP_JSON) or {}
 
 profile: Profile = st.session_state.profile
+
+with st.sidebar:
+    render_system_health_panel(profile)
 
 # ============== Header ==============
 st.title(APP_TITLE)
@@ -1136,7 +1206,7 @@ with tabs[4]:
             "settings_signature": profile_hash(profile),
         })
         st.success("Match log added.")
-        st.toast("Match log added.", icon="?")
+        st.toast("Match log added.")
 
 with tabs[5]:
     st.subheader("Match History / Performance Logs")
@@ -1242,7 +1312,7 @@ with action_cols[0]:
         ok, path = save_unique_json(SNAP_DIR, profile, "manual_snapshot", "snapshot")
         if ok:
             st.success(f"Snapshot saved: {path}")
-            st.toast("Snapshot saved.", icon="?")
+            st.toast("Snapshot saved.")
         else:
             st.info(f"Duplicate snapshot skipped: {path}")
 
@@ -1265,7 +1335,7 @@ with action_cols[3]:
     if st.button("Save Now", use_container_width=True):
         safe_save_json(AUTOSAVE_PATH, profile)
         st.success("Profile autosaved.")
-        st.toast("Profile autosaved.", icon="?")
+        st.toast("Profile autosaved.")
 
 
 # ============== Autosave ==============
