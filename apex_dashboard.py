@@ -793,6 +793,7 @@ def ocr_detect_end_screen_demo() -> Dict[str, Any]:
         import pytesseract
         import mss
         from PIL import Image
+from apex_api_status import render_api_status_panel
 
         keywords = ["CHAMPION", "SQUAD ELIMINATED", "MATCH SUMMARY", "YOU ARE THE CHAMPION", "ELIMINATED"]
         with mss.mss() as sct:
@@ -907,6 +908,12 @@ profile: Profile = st.session_state.profile
 
 # ============== Header ==============
 st.title(APP_TITLE)
+# APEX_API_STATUS_PANEL_START
+try:
+    render_api_status_panel()
+except Exception as exc:
+    st.warning(f"API status panel unavailable: {exc}")
+# APEX_API_STATUS_PANEL_END
 st.caption(
     f"v{APP_VERSION} • Profile: {profile['meta']['profileName']} • "
     f"Updated: {profile['meta']['lastUpdatedISO']}"
