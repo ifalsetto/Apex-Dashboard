@@ -1298,6 +1298,142 @@ with tabs[3]:
 with tabs[4]:
     st.subheader("Auto Match Log")
 
+    st.subheader("Live Apex Monitor")
+    st.caption(
+        "Local mode only. This watches for Apex Legends running on your Windows PC and keeps updating until Apex closes or this Streamlit app closes."
+    )
+
+    monitor = st.session_state.monitor_state
+    monitor.setdefault("enabled", False)
+    monitor.setdefault("poll_seconds", 3)
+    monitor.setdefault("last_logged_match_endISO", "")
+    monitor.setdefault("last_status", "Idle")
+
+    control_cols = st.columns(4)
+
+    with control_cols[0]:
+        if st.button("Start Live Monitor", width="stretch"):
+            monitor["enabled"] = True
+            monitor["last_status"] = "Monitoring started"
+            st.session_state.monitor_state = monitor
+            st.rerun()
+
+    with control_cols[1]:
+        if st.button("Stop Monitor", width="stretch"):
+            monitor["enabled"] = False
+            monitor["last_status"] = "Monitoring stopped"
+            st.session_state.monitor_state = monitor
+            st.rerun()
+
+    with control_cols[2]:
+        monitor["poll_seconds"] = st.number_input(
+            "Poll seconds",
+            min_value=1,
+            max_value=15,
+            value=safe_int(monitor.get("poll_seconds", 3), 3, 1, 15),
+            step=1,
+            key="live_monitor_poll_seconds",
+        )
+
+    with control_cols[3]:
+        ocr_next = st.checkbox(
+            "OCR later",
+            value=False,
+            disabled=True,
+            help="Optional future upgrade for reading end screens / match result screens.",
+        )
+
+    if monitor.get("enabled"):
+        st_autorefresh(
+            interval=int(monitor.get("poll_seconds", 3)) * 1000,
+            key="apex_live_monitor_refresh",
+        )
+
+        try:
+            monitor = monitor_tick(monitor)
+            st.session_state.monitor_state = monitor
+        except Exception as exc:
+            monitor["last_status"] = f"Monitor error: {exc}"
+            st.session_state.monitor_state = monitor
+            st.warning(f"Live monitor error: {exc}")
+
+    apex_running = bool(monitor.get("apex_running"))
+    apex_foreground = bool(monitor.get("apex_foreground"))
+    in_match = bool(monitor.get("in_match"))
+    linked = bool(monitor.get("enabled")) and apex_running
+
+    status_cols = st.columns(5)
+    status_cols[0].metric("Monitor", "On" if monitor.get("enabled") else "Off")
+    status_cols[1].metric("Apex", "Running" if apex_running else "Closed")
+    status_cols[2].metric("Linked", "Yes" if linked else "No")
+    status_cols[3].metric("Foreground", "Yes" if apex_foreground else "No")
+    status_cols[4].metric("Game Session", "Active" if in_match else "Waiting")
+
+    sample_cols = st.columns(4)
+    sample_cols[0].metric("CPU Peak", f'{float(monitor.get("cpu_peak", 0.0)):.2f}%')
+    sample_cols[1].metric("FG Streak", monitor.get("fg_streak", 0))
+    sample_cols[2].metric("BG Streak", monitor.get("bg_streak", 0))
+    sample_cols[3].metric("Last Tick", monitor.get("last_tickISO", ""))
+
+    with st.expander("Live monitor details", expanded=False):
+        st.write(f'Foreground process: `{monitor.get("fg_process", "")}`')
+        st.write(f'Foreground title: `{monitor.get("fg_title", "")}`')
+        st.write(f'Match/session start: `{monitor.get("match_startISO", "")}`')
+        st.write(f'Match/session end: `{monitor.get("match_endISO", "")}`')
+        st.write(f'Status: `{monitor.get("last_status", "Idle")}`')
+
+    ended_match = (
+        bool(monitor.get("match_endISO"))
+        and monitor.get("match_endISO") != monitor.get("last_logged_match_endISO")
+        and bool(monitor.get("match_startISO"))
+    )
+
+    if ended_match:
+        try:
+            start_dt = dt.datetime.fromisoformat(str(monitor.get("match_startISO")))
+            end_dt = dt.datetime.fromisoformat(str(monitor.get("match_endISO")))
+            duration_s = max(0, int((end_dt - start_dt).total_seconds()))
+        except Exception:
+            duration_s = 0
+
+        cpu_avg, cpu_peak = compute_cpu_stats(monitor.get("cpu_samples", []))
+        hdr_mode = hdr_method_label(profile.get("toggles", {}))
+        sig = settings_signature(profile)
+
+        auto_entry = {
+            "createdISO": now_iso(),
+            "match_startISO": monitor.get("match_startISO", ""),
+            "match_endISO": monitor.get("match_endISO", ""),
+            "duration_s": duration_s,
+            "mode": "Auto-detected",
+            "map": "",
+            "hdr_mode": hdr_mode,
+            "avg_fps": "",
+            "one_percent_low": "",
+            "ping_ms": "",
+            "packet_loss_pct": "",
+            "cpu_avg_pct": cpu_avg,
+            "cpu_peak_pct": cpu_peak,
+            "input_feel_1_10": "",
+            "settings_signature": sig,
+            "compare_to_similar": compare_vs_similar(
+                find_similar_entries(profile.get("performanceLogs", []), sig, hdr_mode),
+                {"cpu_avg_pct": cpu_avg},
+            ),
+            "notes": "Auto-created by Live Apex Monitor when Apex/session ended.",
+        }
+
+        profile.setdefault("performanceLogs", []).append(auto_entry)
+        monitor["last_logged_match_endISO"] = monitor.get("match_endISO")
+        monitor["last_status"] = "Auto log created"
+        st.session_state.monitor_state = monitor
+        st.session_state.profile = profile
+
+        st.success("Live monitor created an auto session log.")
+        st.toast("Apex session logged.")
+
+    st.divider()
+
     with st.form("manual_match_log"):
         match_cols = st.columns(4)
         mode = match_cols[0].text_input("Mode", value="Ranked")
