@@ -242,8 +242,16 @@ def save_unique_json(folder: str, obj: Dict[str, Any], reason: str, prefix: str)
         name = slug(obj.get("meta", {}).get("profileName", "profile")) if isinstance(obj, dict) else "object"
         r = slug(reason) if reason else "snapshot"
         filename = f"{prefix}_{name}_{ts}_{r}.json"
-        path = os.path.join(folder, filename)
 
+        base_dir = Path(folder).resolve()
+        path_obj = (base_dir / filename).resolve()
+        try:
+            path_obj.relative_to(base_dir)
+        except ValueError:
+            logger.warning(f"Blocked path traversal attempt: {path_obj}")
+            return False, ""
+
+        path = str(path_obj)
         safe_save_json(path, obj)
         idx["hash_to_file"][h] = path
         save_index(idx)
