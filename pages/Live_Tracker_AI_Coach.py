@@ -117,7 +117,7 @@ def main() -> None:
         st.subheader("Search Player")
         query = st.text_input("Player name", value="", placeholder="Example: NotFalsetto")
         platform = st.selectbox("Platform", ["pc", "psn", "xbl"], index=0)
-        if st.button("Search Tracker.gg", use_container_width=True):
+        if st.button("Search Tracker.gg", width="stretch"):
             result = fetch_tracker_profile(query, platform)
             if result.get("ok"):
                 st.session_state.tracker_profile = result
@@ -146,7 +146,7 @@ def main() -> None:
 
     with coach_col:
         st.subheader("AI Coach Beta")
-        if st.button("Generate coach report", use_container_width=True):
+        if st.button("Generate coach report", width="stretch"):
             st.session_state.ai_coach_report = generate_ai_coach_report(
                 profile=profile,
                 tracker_profile=st.session_state.tracker_profile,

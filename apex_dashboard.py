@@ -913,13 +913,13 @@ def render_system_health_panel(profile: Dict[str, Any]) -> None:
             })
 
         st.write("**Storage**")
-        st.dataframe(storage_rows, use_container_width=True, hide_index=True)
+        st.dataframe(storage_rows, width="stretch", hide_index=True)
 
         if not openai_ready:
             st.warning("OPENAI_API_KEY missing in Streamlit Secrets.")
         if not tracker_ready:
             st.warning("TRACKER_API_KEY missing or blank in Streamlit Secrets.")
-        st.link_button("Open GitHub Repo", REPO_URL, use_container_width=True)
+        st.link_button("Open GitHub Repo", REPO_URL, width="stretch")
 
 
 # ============== STREAMLIT UI ==============
@@ -941,9 +941,9 @@ with st.sidebar:
     st.caption(f"Version: {APP_VERSION}")
     st.markdown("---")
     st.markdown("**Official Links**")
-    st.link_button("GitHub Repo", REPO_URL, use_container_width=True)
-    st.link_button("Report a bug", BUG_URL, use_container_width=True)
-    st.link_button("Request a feature", FEATURE_URL, use_container_width=True)
+    st.link_button("GitHub Repo", REPO_URL, width="stretch")
+    st.link_button("Report a bug", BUG_URL, width="stretch")
+    st.link_button("Request a feature", FEATURE_URL, width="stretch")
 
 st.info("Beta: reproduce once → click Report a bug → paste steps + screenshot.", icon="🧪")
 
@@ -1042,7 +1042,7 @@ with tabs[0]:
     except Exception as exc:
         st.warning(f"Local setup importer unavailable: {exc}")
     else:
-        if st.button("Import Local PC / Display Settings", use_container_width=True):
+        if st.button("Import Local PC / Display Settings", width="stretch"):
             result = collect_local_setup_settings()
 
             if not result.get("ok"):
@@ -1151,7 +1151,7 @@ with tabs[0]:
                 data=LOCAL_DXDIAG_HELPER_PS1.encode("utf-8"),
                 file_name="generate_dxdiag_apex.ps1",
                 mime="text/plain",
-                use_container_width=True,
+                width="stretch",
             )
 
         uploaded_dxdiag = st.file_uploader(
@@ -1179,7 +1179,7 @@ with tabs[0]:
                         }
                         for row in import_rows
                     ],
-                    use_container_width=True,
+                    width="stretch",
                     hide_index=True,
                 )
 
@@ -1232,7 +1232,7 @@ with tabs[1]:
     with tracker_cols[2]:
         st.write("")
         st.write("")
-        search_tracker = st.button("Search Tracker", use_container_width=True)
+        search_tracker = st.button("Search Tracker", width="stretch")
 
     if search_tracker and fetch_tracker_profile:
         st.session_state.tracker_player = tracker_player
@@ -1326,13 +1326,13 @@ with tabs[5]:
 
     logs = profile.get("performanceLogs", [])
     if logs:
-        st.dataframe(logs, use_container_width=True)
+        st.dataframe(logs, width="stretch")
         st.download_button(
             "Download logs CSV",
             data=logs_to_csv_bytes(logs),
             file_name="apex_performance_logs.csv",
             mime="text/csv",
-            use_container_width=True,
+            width="stretch",
         )
     else:
         st.info("No performance logs yet.")
@@ -1359,7 +1359,7 @@ with tabs[6]:
             key="redact_local_network_ids",
         )
 
-        if st.button("Import Local Network Settings", use_container_width=True):
+        if st.button("Import Local Network Settings", width="stretch"):
             result = collect_local_network_settings(redact_local_ids=redact_network_ids)
 
             if not result.get("ok"):
@@ -1378,6 +1378,74 @@ with tabs[6]:
 
 
     network = profile.setdefault("network", {})
+
+    imported_network_details = network.get("importedSettings") or st.session_state.get("last_local_network_import")
+    if imported_network_details:
+        st.subheader("Imported Network Details")
+
+        detail_cols = st.columns(4)
+        detail_cols[0].metric(
+            "Adapter",
+            str(network.get("adapter_name") or imported_network_details.get("InterfaceAlias") or "Unknown"),
+        )
+        detail_cols[1].metric(
+            "Status",
+            str(network.get("adapter_status") or imported_network_details.get("Status") or "Unknown"),
+        )
+        detail_cols[2].metric(
+            "Link Speed",
+            str(network.get("link_speed") or imported_network_details.get("LinkSpeed") or "Unknown"),
+        )
+        detail_cols[3].metric(
+            "Gateway Ping",
+            str(network.get("tests", {}).get("gateway_ping_ms") or imported_network_details.get("GatewayPingMs") or "N/A"),
+        )
+
+        imported_rows = [
+            {
+                "Field": "Connection",
+                "Value": network.get("connection", ""),
+            },
+            {
+                "Field": "Adapter Name",
+                "Value": network.get("adapter_name") or imported_network_details.get("InterfaceAlias", ""),
+            },
+            {
+                "Field": "Adapter Description",
+                "Value": network.get("adapter_description") or imported_network_details.get("InterfaceDescription", ""),
+            },
+            {
+                "Field": "Adapter Status",
+                "Value": network.get("adapter_status") or imported_network_details.get("Status", ""),
+            },
+            {
+                "Field": "Link Speed",
+                "Value": network.get("link_speed") or imported_network_details.get("LinkSpeed", ""),
+            },
+            {
+                "Field": "IPv4 Address",
+                "Value": network.get("ipv4_address") or imported_network_details.get("IPv4Address", ""),
+            },
+            {
+                "Field": "Default Gateway",
+                "Value": network.get("default_gateway") or imported_network_details.get("DefaultGateway", ""),
+            },
+            {
+                "Field": "DNS Servers",
+                "Value": network.get("dns") or imported_network_details.get("DnsServers", ""),
+            },
+            {
+                "Field": "MAC Address",
+                "Value": network.get("mac_address") or imported_network_details.get("MacAddress", ""),
+            },
+            {
+                "Field": "Imported At",
+                "Value": network.get("networkImportedAt") or imported_network_details.get("ImportedAt", ""),
+            },
+        ]
+
+        st.dataframe(imported_rows, width="stretch", hide_index=True)
+
     left, right = st.columns(2)
 
     with left:
@@ -1385,12 +1453,21 @@ with tabs[6]:
         network["isp"] = st.text_input("ISP", value=str(network.get("isp", "")))
         network["router_model"] = st.text_input("Router model", value=str(network.get("router_model", "")))
         network["modem_model"] = st.text_input("Modem / fiber box", value=str(network.get("modem_model", "")))
+        network["adapter_name"] = st.text_input("Adapter name", value=str(network.get("adapter_name", "")))
+        network["adapter_description"] = st.text_input("Adapter description", value=str(network.get("adapter_description", "")))
+        network["default_gateway"] = st.text_input("Default gateway", value=str(network.get("default_gateway", "")))
+        network["dns"] = st.text_input("DNS servers", value=str(network.get("dns", "")))
 
     with right:
         tests = network.setdefault("tests", {})
+        network["adapter_status"] = st.text_input("Adapter status", value=str(network.get("adapter_status", "")))
+        network["link_speed"] = st.text_input("Link speed", value=str(network.get("link_speed", "")))
+        network["ipv4_address"] = st.text_input("IPv4 address", value=str(network.get("ipv4_address", "")))
+        network["mac_address"] = st.text_input("MAC address", value=str(network.get("mac_address", "")))
+        tests["gateway_ping_ms"] = st.text_input("Gateway ping ms", value=str(tests.get("gateway_ping_ms", "")))
         tests["speedtest_down_mbps"] = st.text_input("Download Mbps", value=str(tests.get("speedtest_down_mbps", "")))
         tests["speedtest_up_mbps"] = st.text_input("Upload Mbps", value=str(tests.get("speedtest_up_mbps", "")))
-        tests["speedtest_ping_ms"] = st.text_input("Ping ms", value=str(tests.get("speedtest_ping_ms", "")))
+        tests["speedtest_ping_ms"] = st.text_input("Internet ping ms", value=str(tests.get("speedtest_ping_ms", "")))
         tests["packet_loss_pct"] = st.text_input("Packet loss %", value=str(tests.get("packet_loss_pct", "")))
 
     network["notes"] = st.text_area("Network notes", value=str(network.get("notes", "")), height=100)
@@ -1431,7 +1508,7 @@ with tabs[7]:
             "Size": bytes_human(total_bytes),
         })
 
-    st.dataframe(rows, use_container_width=True)
+    st.dataframe(rows, width="stretch")
 
 with tabs[8]:
     st.subheader("Help Library")
@@ -1458,7 +1535,7 @@ st.divider()
 action_cols = st.columns(4)
 
 with action_cols[0]:
-    if st.button(UI["buttons"]["snapshot"], use_container_width=True):
+    if st.button(UI["buttons"]["snapshot"], width="stretch"):
         ok, path = save_unique_json(SNAP_DIR, profile, "manual_snapshot", "snapshot")
         if ok:
             st.success(f"Snapshot saved: {path}")
@@ -1472,17 +1549,17 @@ with action_cols[1]:
         data=json.dumps(profile, indent=2, ensure_ascii=False).encode("utf-8"),
         file_name=f"{slug(profile['meta'].get('profileName', 'apex_profile'))}.json",
         mime="application/json",
-        use_container_width=True,
+        width="stretch",
     )
 
 with action_cols[2]:
-    if st.button(UI["buttons"]["reset"], use_container_width=True):
+    if st.button(UI["buttons"]["reset"], width="stretch"):
         st.session_state.profile = deep_copy(DEFAULT_PROFILE)
         st.warning("Profile reset to defaults.")
         st.rerun()
 
 with action_cols[3]:
-    if st.button("Save Now", use_container_width=True):
+    if st.button("Save Now", width="stretch"):
         safe_save_json(AUTOSAVE_PATH, profile)
         st.success("Profile autosaved.")
         st.toast("Profile autosaved.")

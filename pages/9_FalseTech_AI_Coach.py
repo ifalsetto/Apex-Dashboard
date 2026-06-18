@@ -91,7 +91,7 @@ context = build_apex_coach_context(profile, goal)
 with st.expander("Preview data sent to the AI coach", expanded=False):
     st.json(context)
 
-if st.button("Generate AI Coach Report", type="primary", use_container_width=True):
+if st.button("Generate AI Coach Report", type="primary", width="stretch"):
     selected_model = model.strip() or OPENAI_MODEL_DEFAULT
 
     with st.spinner("Analyzing Apex dashboard data..."):
@@ -124,7 +124,7 @@ if st.button("Generate AI Coach Report", type="primary", use_container_width=Tru
             data=report.encode("utf-8"),
             file_name=report_path.name,
             mime="text/markdown",
-            use_container_width=True,
+            width="stretch",
         )
 
 st.subheader("Recommended Next Data To Log")
