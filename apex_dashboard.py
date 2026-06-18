@@ -334,16 +334,31 @@ def ps_run(cmd: str) -> str:
 
 
 def apex_process_running() -> bool:
-    """Check if Apex process is running."""
+    """Check if any Apex Legends process is running.
+
+    Process-only detection.
+    Matches r5apex, r5apex.exe, r5apex_dx12, and future r5apex* variants.
+    """
+    try:
+        import psutil
+
+        for proc in psutil.process_iter(["name"]):
+            name = (proc.info.get("name") or "").lower().replace(".exe", "")
+            if name.startswith("r5apex"):
+                return True
+    except Exception as exc:
+        logger.debug(f"psutil Apex process check failed: {exc}")
+
     check = r"""
-$names = @('r5apex','r5apex.exe')
-$found = $false
-foreach ($n in $names) {
-  try { if (Get-Process -Name $n -ErrorAction Stop) { $found = $true } } catch {}
+try {
+    $p = Get-Process | Where-Object { $_.ProcessName -like 'r5apex*' } | Select-Object -First 1
+    if ($p) { '1' } else { '0' }
+} catch {
+    '0'
 }
-if ($found) { '1' } else { '0' }
 """
     return ps_run(check) == "1"
+
 
 
 def get_foreground_window_info() -> Dict[str, str]:
@@ -379,25 +394,57 @@ try { $pname = (Get-Process -Id $pid -ErrorAction Stop).ProcessName } catch {}
 
 
 def get_apex_cpu_pct_sample(window_s: float = 0.5) -> float:
-    """Sample Apex process CPU usage."""
+    """Sample Apex process CPU usage using process-only detection."""
+    try:
+        import psutil
+
+        apex_proc = None
+        for proc in psutil.process_iter(["name"]):
+            name = (proc.info.get("name") or "").lower().replace(".exe", "")
+            if name.startswith("r5apex"):
+                apex_proc = proc
+                break
+
+        if apex_proc is None:
+            return 0.0
+
+        apex_proc.cpu_percent(interval=None)
+        time.sleep(max(0.2, window_s))
+        pct = apex_proc.cpu_percent(interval=None)
+
+        cores = os.cpu_count() or 1
+        normalized = pct / cores
+
+        return max(0.0, min(100.0, normalized))
+
+    except Exception as exc:
+        logger.debug(f"Failed to sample Apex CPU via psutil: {exc}")
+
     script1 = r"""
-try { $p = Get-Process -Name r5apex -ErrorAction Stop; "{0}" -f $p.CPU } catch { "" }
+try {
+    $p = Get-Process | Where-Object { $_.ProcessName -like 'r5apex*' } | Select-Object -First 1
+    if ($p) { "{0}" -f $p.CPU } else { "" }
+} catch { "" }
 """
     a = ps_run(script1)
     time.sleep(max(0.2, window_s))
     b = ps_run(script1)
+
     try:
         if not a or not b:
             return 0.0
+
         cpu_a = float(a)
         cpu_b = float(b)
         delta_cpu_s = max(0.0, cpu_b - cpu_a)
         cores = os.cpu_count() or 1
         pct = (delta_cpu_s / window_s) * 100.0 / cores
+
         return max(0.0, min(100.0, pct))
-    except (ValueError, TypeError):
-        logger.debug("Failed to compute CPU percentage")
+
+    except Exception:
         return 0.0
+
 
 
 def ping_sample(host: str = "1.1.1.1", count: int = 10) -> Tuple[Optional[int], Optional[float]]:
@@ -432,54 +479,67 @@ def ping_sample(host: str = "1.1.1.1", count: int = 10) -> Tuple[Optional[int], 
 
 # -------------------- Match Monitor (heuristic) --------------------
 def monitor_tick(state: MonitorState) -> MonitorState:
-    """Update match monitor state."""
-    tick_ts = now_iso()
-    fg = get_foreground_window_info()
-    apex_running = apex_process_running()
-    apex_foreground = apex_running and (fg.get("process", "").lower() == "r5apex")
+    """Update monitor state using process-only detection.
 
-    state.setdefault("fg_streak", 0)
-    state.setdefault("bg_streak", 0)
+    Rules:
+    - If r5apex* starts running, begin monitoring.
+    - If r5apex* remains running, keep monitoring.
+    - If r5apex* closes, end monitoring and allow log creation.
+    """
+    tick_ts = now_iso()
+
+    previous_running = bool(state.get("apex_running", False))
+    previous_in_match = bool(state.get("in_match", False))
+
+    apex_running = apex_process_running()
+
     state.setdefault("in_match", False)
     state.setdefault("match_startISO", "")
     state.setdefault("match_endISO", "")
     state.setdefault("cpu_samples", [])
     state.setdefault("cpu_peak", 0.0)
+    state.setdefault("last_status", "Waiting for Apex process")
 
     cpu_pct = 0.0
+
     if apex_running:
         cpu_pct = get_apex_cpu_pct_sample(0.35)
-        state["cpu_samples"].append(cpu_pct)
-        state["cpu_peak"] = max(state.get("cpu_peak", 0.0), cpu_pct)
 
-    if apex_foreground:
-        state["fg_streak"] += 1
-        state["bg_streak"] = 0
-    else:
-        state["bg_streak"] += 1
-        state["fg_streak"] = 0
-
-    START_STREAK = safe_int(state.get("start_streak_needed"), 3)
-    END_STREAK = safe_int(state.get("end_streak_needed"), 6)
-
-    if (not state["in_match"]) and apex_foreground and state["fg_streak"] >= START_STREAK:
+    # Apex just started, or app opened while Apex is already running.
+    if apex_running and not previous_in_match:
         state["in_match"] = True
         state["match_startISO"] = tick_ts
         state["match_endISO"] = ""
         state["cpu_samples"] = []
         state["cpu_peak"] = 0.0
+        state["last_status"] = "Apex process detected. Monitoring started."
 
-    if state["in_match"]:
-        if (not apex_running) or (not apex_foreground and state["bg_streak"] >= END_STREAK):
-            state["in_match"] = False
-            state["match_endISO"] = tick_ts
+    # Apex is still running.
+    if apex_running and state.get("in_match"):
+        state["cpu_samples"].append(cpu_pct)
+        state["cpu_peak"] = max(float(state.get("cpu_peak", 0.0)), cpu_pct)
+        state["last_status"] = "Apex process running. Monitoring active."
+
+    # Apex just closed.
+    if (not apex_running) and previous_running and previous_in_match:
+        state["in_match"] = False
+        state["match_endISO"] = tick_ts
+        state["last_status"] = "Apex process closed. Monitoring ended."
+
+    # Apex is not running and no active session exists.
+    if (not apex_running) and (not state.get("in_match")) and not state.get("match_endISO"):
+        state["last_status"] = "Waiting for Apex process."
 
     state["last_tickISO"] = tick_ts
     state["apex_running"] = apex_running
-    state["apex_foreground"] = apex_foreground
-    state["fg_title"] = fg.get("title", "")
-    state["fg_process"] = fg.get("process", "")
+    state["apex_foreground"] = False
+    state["fg_title"] = ""
+    state["fg_process"] = "r5apex*" if apex_running else ""
+    state["fg_streak"] = 0
+    state["bg_streak"] = 0
+
     return state
+
 
 
 def compute_cpu_stats(samples: List[float]) -> Tuple[float, float]:
@@ -1300,7 +1360,7 @@ with tabs[4]:
 
     st.subheader("Live Apex Monitor")
     st.caption(
-        "Local mode only. This watches Apex Legends on your Windows PC, auto-links when Apex runs, starts monitoring when Apex becomes active, and ends/logs when Apex closes or goes inactive long enough."
+        "Local mode only. This uses process-only detection. It starts monitoring when r5apex* runs and ends/logs when the Apex process closes."
     )
 
     monitor = st.session_state.monitor_state
@@ -1367,28 +1427,26 @@ with tabs[4]:
             st.warning(f"Live monitor error: {exc}")
 
     apex_running = bool(monitor.get("apex_running"))
-    apex_foreground = bool(monitor.get("apex_foreground"))
     in_match = bool(monitor.get("in_match"))
     linked = bool(monitor.get("enabled")) and apex_running
 
-    status_cols = st.columns(5)
+    status_cols = st.columns(4)
     status_cols[0].metric("Monitor", "On" if monitor.get("enabled") else "Off")
-    status_cols[1].metric("Apex", "Running" if apex_running else "Closed")
+    status_cols[1].metric("Apex Process", "Running" if apex_running else "Closed")
     status_cols[2].metric("Linked", "Yes" if linked else "No")
-    status_cols[3].metric("Foreground", "Yes" if apex_foreground else "No")
-    status_cols[4].metric("Match Monitor", "Active" if in_match else "Waiting")
+    status_cols[3].metric("Game Monitor", "Recording" if in_match else "Waiting")
 
     sample_cols = st.columns(4)
     sample_cols[0].metric("CPU Peak", f'{float(monitor.get("cpu_peak", 0.0)):.2f}%')
-    sample_cols[1].metric("FG Streak", monitor.get("fg_streak", 0))
-    sample_cols[2].metric("BG Streak", monitor.get("bg_streak", 0))
+    sample_cols[1].metric("Detection", "Process-only")
+    sample_cols[2].metric("Started", monitor.get("match_startISO", "") or "-")
     sample_cols[3].metric("Last Tick", monitor.get("last_tickISO", ""))
 
     with st.expander("Live monitor details", expanded=False):
-        st.write(f'Foreground process: `{monitor.get("fg_process", "")}`')
-        st.write(f'Foreground title: `{monitor.get("fg_title", "")}`')
-        st.write(f'Match/session start: `{monitor.get("match_startISO", "")}`')
-        st.write(f'Match/session end: `{monitor.get("match_endISO", "")}`')
+        st.write("Detection mode: `process-only`")
+        st.write("Process match: `r5apex*`")
+        st.write(f'Session start: `{monitor.get("match_startISO", "")}`')
+        st.write(f'Session end: `{monitor.get("match_endISO", "")}`')
         st.write(f'Status: `{monitor.get("last_status", "Idle")}`')
 
     with st.expander("OCR upgrade path", expanded=False):
