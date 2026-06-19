@@ -1,4 +1,11 @@
-"""FalseTech Apex Command Center home page."""
+"""FalseTech Apex Command Center home page.
+
+This Streamlit page serves as the entry point into the FalseTech Apex system.  It
+displays the current player profile card, live Apex process status, last match
+summary, quick actions, a system lab map, a navigation bar, and a system
+health summary.  Everything on this page is read-only and local‑first: it
+never attempts to read process memory or interact with anti‑cheat systems.
+"""
 from __future__ import annotations
 
 from pathlib import Path
@@ -20,17 +27,20 @@ if THEME_CSS_PATH.exists():
 
 
 def get_profile() -> Dict[str, Any]:
+    """Load the autosaved profile if present; otherwise return an empty dict."""
     loaded = safe_load_json(config.AUTOSAVE_PATH)
     return loaded if isinstance(loaded, dict) else {}
 
 
 def latest_session(logs: List[Dict[str, Any]]) -> Dict[str, Any]:
+    """Return the most recent performance log from a list of session logs."""
     if not logs:
         return {}
     return sorted(logs, key=lambda row: str(row.get("createdISO", "")), reverse=True)[0]
 
 
 def folder_status(path: Path) -> Dict[str, Any]:
+    """Summarize readiness, file count and total size for a given folder."""
     if not path.exists():
         return {"Area": path.name, "Ready": False, "Files": 0, "Size": "0 B"}
 
@@ -42,23 +52,29 @@ def folder_status(path: Path) -> Dict[str, Any]:
                 files += 1
                 total += item.stat().st_size
     except Exception:
+        # If there is an exception enumerating files, report zeroes and carry on.
         pass
 
     return {"Area": path.name, "Ready": True, "Files": files, "Size": bytes_human(total)}
 
 
-profile = get_profile()
-meta = profile.get("meta", {}) if isinstance(profile, dict) else {}
-targets = profile.get("targets", {}) if isinstance(profile, dict) else {}
-network = profile.get("network", {}) if isinstance(profile, dict) else {}
-logs = profile.get("performanceLogs", []) if isinstance(profile.get("performanceLogs", []), list) else []
-last = latest_session(logs)
+# Load profile and derive commonly used sections.
+profile: Dict[str, Any] = get_profile()
+meta: Dict[str, Any] = profile.get("meta", {}) if isinstance(profile, dict) else {}
+targets: Dict[str, Any] = profile.get("targets", {}) if isinstance(profile, dict) else {}
+network: Dict[str, Any] = profile.get("network", {}) if isinstance(profile, dict) else {}
+logs: List[Dict[str, Any]] = profile.get("performanceLogs", []) if isinstance(profile.get("performanceLogs", []), list) else []
+last: Dict[str, Any] = latest_session(logs)
 status = get_apex_process_status()
 process_verification = verify_supported_process_names()
 
+# Page header and description
 st.title("FalseTech Apex Command Center")
-st.caption("Player home base, live process status, session summary, and quick access to optimizer tools.")
+st.caption(
+    "Player home base, live process status, session summary, and quick access to optimizer tools."
+)
 
+# Hero section: profile card and live status
 hero_left, hero_right = st.columns([2, 1])
 
 with hero_left:
@@ -78,14 +94,16 @@ with hero_right:
     if status.error:
         st.caption(f"Detector note: {status.error}")
 
+# Divider and basic runtime stats
 st.divider()
 
 status_cols = st.columns(4)
-status_cols[0].metric("Detection", "Process-only")
+status_cols[0].metric("Detection", "Process‑only")
 status_cols[1].metric("CPU Sample", f"{status.cpu_pct:.2f}%")
 status_cols[2].metric("PID", status.pid if status.pid else "—")
 status_cols[3].metric("Refresh Target", f"{safe_int(targets.get('refreshHz', 240), 240)} Hz")
 
+# Last session summary
 st.subheader("Last Session")
 if last:
     session_cols = st.columns(5)
@@ -99,17 +117,27 @@ if last:
 else:
     st.info("No session logs yet. Open the main dashboard and use Auto Match Log / Live Apex Monitor.")
 
+# Quick actions for common tasks
 st.subheader("Quick Actions")
 quick_cols = st.columns(4)
 quick_cols[0].link_button("Open Main Dashboard", "./", width="stretch")
 quick_cols[1].link_button("GitHub Repo", config.REPO_URL, width="stretch")
-quick_cols[2].link_button("Report Bug", f"{config.REPO_URL}/issues/new?template=bug_report.yml", width="stretch")
-quick_cols[3].link_button("Request Feature", f"{config.REPO_URL}/issues/new?template=feature_request.yml", width="stretch")
+quick_cols[2].link_button(
+    "Report Bug",
+    f"{config.REPO_URL}/issues/new?template=bug_report.yml",
+    width="stretch",
+)
+quick_cols[3].link_button(
+    "Request Feature",
+    f"{config.REPO_URL}/issues/new?template=feature_request.yml",
+    width="stretch",
+)
 
-st.subheader("Command Center Map")
+# System Lab map to orient players to available tools
+st.subheader("System Lab Map")
 map_rows = [
     {"Area": "Setup", "Purpose": "Profile, monitor, GPU, launch options, DxDiag import"},
-    {"Area": "Live Monitor", "Purpose": "Process-only Apex detection and session logging"},
+    {"Area": "Live Monitor", "Purpose": "Process‑only Apex detection and session logging"},
     {"Area": "Tracker", "Purpose": "Player lookup and stats fallback"},
     {"Area": "Network", "Purpose": "Local adapter, DNS, gateway, latency notes"},
     {"Area": "Match History", "Purpose": "Session logs and CSV export"},
@@ -117,13 +145,34 @@ map_rows = [
 ]
 st.dataframe(map_rows, hide_index=True, width="stretch")
 
+# Navigation links to jump into different areas of the dashboard.  These links
+# either point to the main dashboard (Setup, Network, Match History) with a
+# fragment hint for the target tab, or to dedicated Streamlit pages.
+st.subheader("Navigation")
+nav_items = [
+    ("Setup", "./"),
+    ("Live Monitor", "./#live-monitor"),
+    ("Tracker", "./Live_Tracker_AI_Coach"),
+    ("Network", "./#net"),
+    ("Match History", "./#perf"),
+]
+nav_cols = st.columns(len(nav_items))
+for idx, (label, url) in enumerate(nav_items):
+    nav_cols[idx].link_button(label, url, width="stretch")
+
+# System health summary and storage status
 st.subheader("System Health Summary")
 health_cols = st.columns(4)
-health_cols[0].metric("OpenAI Key", "Set" if bool(st.secrets.get("OPENAI_API_KEY", "")) else "Missing")
-health_cols[1].metric("Tracker Key", "Set" if bool(st.secrets.get("TRACKER_API_KEY", "")) else "Missing")
+health_cols[0].metric(
+    "OpenAI Key", "Set" if bool(st.secrets.get("OPENAI_API_KEY", "")) else "Missing"
+)
+health_cols[1].metric(
+    "Tracker Key", "Set" if bool(st.secrets.get("TRACKER_API_KEY", "")) else "Missing"
+)
 health_cols[2].metric("Logs", len(logs))
 health_cols[3].metric("Network", str(network.get("connection", "Unknown")))
 
+# Show storage readiness for important folders
 storage_rows = [
     folder_status(config.PROFILES_DIR),
     folder_status(config.SNAP_DIR),
@@ -132,10 +181,16 @@ storage_rows = [
 ]
 st.dataframe(storage_rows, hide_index=True, width="stretch")
 
+# Debugging and guidance expanders
 with st.expander("Process detection verification", expanded=False):
     st.write("The detector treats these Apex process names as valid:")
     st.json(process_verification)
 
 with st.expander("System Lab direction", expanded=False):
-    st.write("The optimizer tools remain available in the main dashboard. This page is the command layer for player identity, live status, quick navigation, and session summaries.")
-    st.write("Next build targets: squad room, legend lab, weapon lab, creator lane, and richer Tracker-driven player cards.")
+    st.write(
+        "The optimizer tools remain available in the main dashboard. This page is the command layer "
+        "for player identity, live status, quick navigation, and session summaries."
+    )
+    st.write(
+        "Next build targets: squad room, legend lab, weapon lab, creator lane, and richer Tracker-driven player cards."
+    )

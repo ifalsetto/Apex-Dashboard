@@ -1,290 +1,244 @@
-
-# One-click local Windows import helpers for Apex Dashboard.
-# Local-first only:
-# - Works when Streamlit runs on the user's Windows PC.
-# - Does not collect the user's PC info from Streamlit Cloud.
-# - Uses read-only Windows commands.
-
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import json
-import platform
-import re
+import os
 import subprocess
-from copy import deepcopy
-from datetime import datetime
-from typing import Any, Dict
+from pathlib import Path
+from typing import Any, Dict, Optional
 
 
-def is_windows_local() -> bool:
-    return platform.system().lower() == "windows"
-
-
-def _run_powershell_json(script: str, timeout: int = 20) -> Dict[str, Any]:
-    if not is_windows_local():
-        return {
-            "ok": False,
-            "error": "One-click local import only works when the dashboard is running locally on Windows.",
-            "data": {},
-        }
-
-    shells = ["powershell", "pwsh"]
-    last_error = ""
-
-    for shell in shells:
-        try:
-            completed = subprocess.run(
-                [
-                    shell,
-                    "-NoProfile",
-                    "-ExecutionPolicy",
-                    "Bypass",
-                    "-Command",
-                    script,
-                ],
-                capture_output=True,
-                text=True,
-                timeout=timeout,
-                check=False,
-            )
-
-            if completed.returncode != 0:
-                last_error = completed.stderr.strip() or completed.stdout.strip()
-                continue
-
-            output = completed.stdout.strip()
-            if not output:
-                last_error = "PowerShell returned no output."
-                continue
-
-            return {
-                "ok": True,
-                "error": "",
-                "data": json.loads(output),
-            }
-
-        except Exception as exc:
-            last_error = str(exc)
-
-    return {
-        "ok": False,
-        "error": last_error or "PowerShell could not run.",
-        "data": {},
-    }
-
-
-def _redact_mac(value: str) -> str:
-    if not value:
-        return value
-    return "<redacted-mac>"
-
-
-def _redact_ipv4(value: str) -> str:
-    if not value:
-        return value
-
-    value = str(value)
-    value = re.sub(r"\b10\.\d+\.\d+\.\d+\b", "10.x.x.x", value)
-    value = re.sub(r"\b192\.168\.\d+\.\d+\b", "192.168.x.x", value)
-    value = re.sub(r"\b172\.(1[6-9]|2\d|3[0-1])\.\d+\.\d+\b", "172.x.x.x", value)
-    return value
-
-
-def collect_local_setup_settings() -> Dict[str, Any]:
-    script = r'''
-$ErrorActionPreference = "SilentlyContinue"
-
-$os = Get-CimInstance Win32_OperatingSystem
-$cpu = Get-CimInstance Win32_Processor | Select-Object -First 1
-$cs = Get-CimInstance Win32_ComputerSystem
-$gpu = Get-CimInstance Win32_VideoController |
-    Sort-Object AdapterRAM -Descending |
-    Select-Object -First 1
-
-$ramGb = $null
-if ($cs.TotalPhysicalMemory) {
-    $ramGb = [math]::Round($cs.TotalPhysicalMemory / 1GB, 1)
+GENERIC_DEFAULTS = {
+    "source_machine": "Local PC",
+    "connection": "",
+    "isp": "",
+    "router_model": "",
+    "modem_fiber_box": "",
+    "adapter_name": "",
+    "adapter_description": "",
+    "adapter_status": "",
+    "link_speed": "",
+    "default_gateway": "",
+    "dns_servers": "",
+    "ipv4_address": "",
+    "mac_address": "",
+    "gateway_ping_ms": "",
+    "internet_ping_ms": "",
+    "packet_loss_pct": "",
+    "download_mbps": "",
+    "upload_mbps": "",
 }
 
-$resolution = ""
-if ($gpu.CurrentHorizontalResolution -and $gpu.CurrentVerticalResolution) {
-    $resolution = "$($gpu.CurrentHorizontalResolution)x$($gpu.CurrentVerticalResolution)"
+
+def _read_toml_secret_path() -> Optional[str]:
+    """
+    Reads an optional local-only settings path from .streamlit/secrets.toml.
+    This file should never be committed.
+    """
+    secrets_path = Path(".streamlit/secrets.toml")
+    if not secrets_path.exists():
+        return None
+
+    try:
+        import tomllib
+        data = tomllib.loads(secrets_path.read_text(encoding="utf-8"))
+        value = data.get("APEX_NETWORK_SETTINGS_PATH")
+        return str(value) if value else None
+    except Exception:
+        return None
+
+
+def _configured_settings_paths() -> list[str]:
+    paths: list[str] = []
+
+    env_path = os.environ.get("APEX_NETWORK_SETTINGS_PATH")
+    if env_path:
+        paths.append(env_path)
+
+    secret_path = _read_toml_secret_path()
+    if secret_path:
+        paths.append(secret_path)
+
+    paths.extend([
+        "data/network/network_settings.json",
+        "data/network/local_network_settings.json",
+        "data/network/imported_network_settings.json",
+    ])
+
+    return paths
+
+
+def _load_json(path: str | Path) -> Optional[Dict[str, Any]]:
+    try:
+        p = Path(path)
+        if p.exists() and p.is_file():
+            with p.open("r", encoding="utf-8") as handle:
+                data = json.load(handle)
+            if isinstance(data, dict):
+                data["_import_source"] = str(p)
+                return data
+    except Exception:
+        return None
+    return None
+
+
+def _run_powershell_json(script: str) -> Optional[Dict[str, Any]]:
+    try:
+        completed = subprocess.run(
+            ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", script],
+            capture_output=True,
+            text=True,
+            timeout=12,
+        )
+
+        if completed.returncode != 0:
+            return None
+
+        raw = completed.stdout.strip()
+        if not raw:
+            return None
+
+        data = json.loads(raw)
+        return data if isinstance(data, dict) else None
+    except Exception:
+        return None
+
+
+def _collect_local_windows_adapter() -> Optional[Dict[str, Any]]:
+    ps = r'''
+$adapter = Get-NetAdapter |
+Where-Object {
+    $_.Status -eq "Up" -and
+    $_.HardwareInterface -eq $true -and
+    $_.InterfaceDescription -notmatch "Virtual|VPN|Loopback|Hyper-V|VMware|VirtualBox|Tailscale"
+} |
+Select-Object -First 1
+
+if (-not $adapter) {
+    throw "No active network adapter found."
 }
 
-[PSCustomObject]@{
-    OperatingSystem = $os.Caption
-    OSVersion = $os.Version
-    CPU = $cpu.Name
-    RAMGB = $ramGb
-    GPU = $gpu.Name
-    VideoMode = $gpu.VideoModeDescription
-    Resolution = $resolution
-    RefreshHz = $gpu.CurrentRefreshRate
-    GPUDriverVersion = $gpu.DriverVersion
-    GPUDriverDate = $gpu.DriverDate
-    ImportedAt = (Get-Date).ToString("s")
-} | ConvertTo-Json -Compress -Depth 4
+$ip = Get-NetIPConfiguration -InterfaceAlias $adapter.Name
+$dns = Get-DnsClientServerAddress -InterfaceAlias $adapter.Name -AddressFamily IPv4 -ErrorAction SilentlyContinue
+$gateway = $ip.IPv4DefaultGateway.NextHop
+
+$result = [ordered]@{
+    source_machine = $env:COMPUTERNAME
+    exported_at = (Get-Date).ToString("o")
+    connection = $adapter.Name
+    adapter_name = $adapter.Name
+    adapter_description = $adapter.InterfaceDescription
+    adapter_status = $adapter.Status
+    link_speed = $adapter.LinkSpeed
+    default_gateway = $gateway
+    dns_servers = ($dns.ServerAddresses -join " / ")
+    ipv4_address = $ip.IPv4Address.IPAddress
+    mac_address = $adapter.MacAddress
+    router_model = ""
+    modem_fiber_box = ""
+    isp = ""
+    gateway_ping_ms = ""
+    internet_ping_ms = ""
+    packet_loss_pct = ""
+    download_mbps = ""
+    upload_mbps = ""
+}
+
+$result | ConvertTo-Json -Depth 5
 '''
+    return _run_powershell_json(ps)
 
-    result = _run_powershell_json(script)
-    if not result["ok"]:
-        return result
 
-    return {
-        "ok": True,
-        "error": "",
-        "data": result.get("data", {}) or {},
-    }
+def _normalize(data: Dict[str, Any]) -> Dict[str, Any]:
+    merged = dict(GENERIC_DEFAULTS)
+    merged.update({k: v for k, v in data.items() if v is not None})
+
+    dns = merged.get("dns_servers")
+    if isinstance(dns, list):
+        merged["dns_servers"] = " / ".join(str(x) for x in dns)
+
+    merged["sourceMachine"] = merged.get("source_machine", "")
+    merged["routerModel"] = merged.get("router_model", "")
+    merged["modemFiberBox"] = merged.get("modem_fiber_box", "")
+    merged["adapterName"] = merged.get("adapter_name", "")
+    merged["adapterDescription"] = merged.get("adapter_description", "")
+    merged["adapterStatus"] = merged.get("adapter_status", "")
+    merged["linkSpeed"] = merged.get("link_speed", "")
+    merged["defaultGateway"] = merged.get("default_gateway", "")
+    merged["dnsServers"] = merged.get("dns_servers", "")
+    merged["ipv4Address"] = merged.get("ipv4_address", "")
+    merged["macAddress"] = merged.get("mac_address", "")
+    merged["gatewayPingMs"] = merged.get("gateway_ping_ms", "")
+    merged["internetPingMs"] = merged.get("internet_ping_ms", "")
+    merged["packetLossPct"] = merged.get("packet_loss_pct", "")
+    merged["downloadMbps"] = merged.get("download_mbps", "")
+    merged["uploadMbps"] = merged.get("upload_mbps", "")
+
+    return merged
+
+
+def _redact(data: Dict[str, Any]) -> Dict[str, Any]:
+    redacted = dict(data)
+    for key in ("ipv4_address", "ipv4Address", "mac_address", "macAddress"):
+        if key in redacted:
+            redacted[key] = "Redacted"
+    return redacted
 
 
 def collect_local_network_settings(redact_local_ids: bool = True) -> Dict[str, Any]:
-    script = r'''
-$ErrorActionPreference = "SilentlyContinue"
+    searched = []
 
-$cfg = Get-NetIPConfiguration |
-    Where-Object { $_.IPv4DefaultGateway -ne $null } |
-    Select-Object -First 1
+    for path in _configured_settings_paths():
+        searched.append(path)
+        data = _load_json(path)
+        if data:
+            normalized = _normalize(data)
+            if redact_local_ids:
+                normalized = _redact(normalized)
+            return {
+                "ok": True,
+                "data": normalized,
+                "source": path,
+                "mode": "configured_json_import",
+                "searched": searched,
+            }
 
-if ($null -eq $cfg) {
-    $cfg = Get-NetIPConfiguration | Select-Object -First 1
-}
+    local = _collect_local_windows_adapter()
+    if local:
+        normalized = _normalize(local)
+        if redact_local_ids:
+            normalized = _redact(normalized)
+        return {
+            "ok": True,
+            "data": normalized,
+            "source": "local_windows_adapter",
+            "mode": "local_windows_adapter",
+            "searched": searched,
+        }
 
-$adapter = $null
-$dns = $null
-$gateway = ""
-
-if ($cfg) {
-    $adapter = Get-NetAdapter -InterfaceIndex $cfg.InterfaceIndex
-    $dns = Get-DnsClientServerAddress -InterfaceIndex $cfg.InterfaceIndex -AddressFamily IPv4
-
-    if ($cfg.IPv4DefaultGateway) {
-        $gateway = ($cfg.IPv4DefaultGateway | Select-Object -First 1).NextHop
-    }
-}
-
-$pingAvg = $null
-if ($gateway) {
-    $ping = Test-Connection -ComputerName $gateway -Count 2 -ErrorAction SilentlyContinue
-    if ($ping) {
-        $pingAvg = [math]::Round(($ping | Measure-Object ResponseTime -Average).Average, 1)
-    }
-}
-
-$ipv4 = ""
-if ($cfg.IPv4Address) {
-    $ipv4 = ($cfg.IPv4Address.IPAddress -join ", ")
-}
-
-$dnsServers = ""
-if ($dns.ServerAddresses) {
-    $dnsServers = ($dns.ServerAddresses -join ", ")
-}
-
-[PSCustomObject]@{
-    InterfaceAlias = $cfg.InterfaceAlias
-    InterfaceDescription = $adapter.InterfaceDescription
-    Status = $adapter.Status
-    LinkSpeed = $adapter.LinkSpeed
-    MacAddress = $adapter.MacAddress
-    IPv4Address = $ipv4
-    DefaultGateway = $gateway
-    DnsServers = $dnsServers
-    GatewayPingMs = $pingAvg
-    ImportedAt = (Get-Date).ToString("s")
-} | ConvertTo-Json -Compress -Depth 4
-'''
-
-    result = _run_powershell_json(script)
-    if not result["ok"]:
-        return result
-
-    data = result.get("data", {}) or {}
-
+    fallback = _normalize({})
     if redact_local_ids:
-        data["MacAddress"] = _redact_mac(str(data.get("MacAddress", "")))
-        data["IPv4Address"] = _redact_ipv4(str(data.get("IPv4Address", "")))
+        fallback = _redact(fallback)
 
     return {
         "ok": True,
-        "error": "",
-        "data": data,
+        "data": fallback,
+        "source": "generic_empty_fallback",
+        "mode": "generic_empty_fallback",
+        "warning": "No configured network settings file or local adapter data was available.",
+        "searched": searched,
     }
 
 
-def _infer_connection_type(data: Dict[str, Any]) -> str:
-    label = f'{data.get("InterfaceAlias", "")} {data.get("InterfaceDescription", "")}'.lower()
+def apply_network_settings_to_profile(profile: Dict[str, Any], imported_network: Dict[str, Any]) -> Dict[str, Any]:
+    if not isinstance(profile, dict):
+        profile = {}
 
-    if any(token in label for token in ["wi-fi", "wifi", "wireless", "wlan"]):
-        return "Wi-Fi"
+    imported = _normalize(imported_network)
+    network = profile.setdefault("network", {})
 
-    if any(token in label for token in ["ethernet", "realtek", "intel", "gbe", "lan"]):
-        return "Ethernet"
+    network["importedSettings"] = imported
 
-    return "Unknown"
+    for key, value in imported.items():
+        network[key] = value
 
-
-def apply_setup_settings_to_profile(profile: Dict[str, Any], data: Dict[str, Any]) -> Dict[str, Any]:
-    updated = deepcopy(profile)
-
-    meta = updated.setdefault("meta", {})
-    targets = updated.setdefault("targets", {})
-    report = updated.setdefault("systemReport", {})
-
-    if data.get("OperatingSystem"):
-        meta["os"] = data["OperatingSystem"]
-
-    if data.get("GPU"):
-        meta["gpu"] = data["GPU"]
-
-    if data.get("VideoMode"):
-        meta["monitor"] = data["VideoMode"]
-
-    if data.get("RefreshHz"):
-        try:
-            targets["refreshHz"] = int(data["RefreshHz"])
-        except Exception:
-            report["refreshHz"] = data["RefreshHz"]
-
-    report["operatingSystem"] = data.get("OperatingSystem", "")
-    report["osVersion"] = data.get("OSVersion", "")
-    report["cpu"] = data.get("CPU", "")
-    report["ramGB"] = data.get("RAMGB", "")
-    report["gpu"] = data.get("GPU", "")
-    report["videoMode"] = data.get("VideoMode", "")
-    report["resolution"] = data.get("Resolution", "")
-    report["refreshHz"] = data.get("RefreshHz", "")
-    report["gpuDriverVersion"] = data.get("GPUDriverVersion", "")
-    report["gpuDriverDate"] = data.get("GPUDriverDate", "")
-    report["setupImportedAt"] = data.get("ImportedAt", datetime.now().isoformat(timespec="seconds"))
-
-    return updated
-
-
-def apply_network_settings_to_profile(profile: Dict[str, Any], data: Dict[str, Any]) -> Dict[str, Any]:
-    updated = deepcopy(profile)
-
-    network = updated.setdefault("network", {})
-    tests = network.setdefault("tests", {})
-
-    network["connection"] = _infer_connection_type(data)
-    network["adapter_name"] = data.get("InterfaceAlias", "")
-    network["adapter_description"] = data.get("InterfaceDescription", "")
-    network["adapter_status"] = data.get("Status", "")
-    network["link_speed"] = data.get("LinkSpeed", "")
-    network["mac_address"] = data.get("MacAddress", "")
-    network["ipv4_address"] = data.get("IPv4Address", "")
-    network["default_gateway"] = data.get("DefaultGateway", "")
-    network["dns"] = data.get("DnsServers", "")
-    network["importedSettings"] = data
-    network["networkImportedAt"] = data.get("ImportedAt", datetime.now().isoformat(timespec="seconds"))
-
-    if data.get("GatewayPingMs") is not None:
-        tests["gateway_ping_ms"] = data.get("GatewayPingMs")
-
-    existing_notes = str(network.get("notes", "")).strip()
-    import_note = f'Imported local network settings at {network["networkImportedAt"]}.'
-
-    if import_note not in existing_notes:
-        network["notes"] = f"{existing_notes}\n{import_note}".strip()
-
-    return updated
+    return profile

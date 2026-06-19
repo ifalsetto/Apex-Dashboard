@@ -240,8 +240,16 @@ def save_unique_json(folder: str, obj: Dict[str, Any], reason: str, prefix: str)
 
         ts = dt.datetime.now().strftime("%Y%m%d_%H%M%S")
         name = slug(obj.get("meta", {}).get("profileName", "profile")) if isinstance(obj, dict) else "object"
+        if not name or not re.fullmatch(r"[A-Za-z0-9_-]+", name):
+            logger.warning("Invalid profile name for filename; using safe fallback.")
+            name = "profile"
         r = slug(reason) if reason else "snapshot"
-        filename = f"{prefix}_{name}_{ts}_{r}.json"
+        if not r or not re.fullmatch(r"[A-Za-z0-9_-]+", r):
+            r = "snapshot"
+        safe_prefix = slug(prefix) if prefix else "snapshot"
+        if not safe_prefix or not re.fullmatch(r"[A-Za-z0-9_-]+", safe_prefix):
+            safe_prefix = "snapshot"
+        filename = f"{safe_prefix}_{name}_{ts}_{r}.json"
 
         base_dir = Path(folder).resolve()
         path_obj = (base_dir / filename).resolve()
