@@ -20,3 +20,46 @@ pip-freeze.txt
 *.key
 *.pem
 *.zip
+
+# Local secrets / machine-specific config
+.streamlit/secrets.toml
+.env
+.env.*
+!.env.example
+
+# Local network/system exports
+data/network/*.json
+data/network/*.jsonl
+data/network/*.log
+!data/network/.gitkeep
+
+# Local diagnostics
+*.log
+*dxdiag*.txt
+*DxDiag*.txt
+diagnostics/
+reports/local/
+
+# Local backups / personal machine patches
+*.old.py
+*.personal-backup.py
+local_backups/
+
+# Local secrets / machine-specific config
+.streamlit/secrets.toml
+.env
+.env.*
+!.env.example
+
+# Local network/system exports
+data/network/*.json
+data/network/*.jsonl
+data/network/*.log
+!data/network/.gitkeep
+
+# Local diagnostics
+*.log
+*dxdiag*.txt
+*DxDiag*.txt
+diagnostics/
+reports/local/
