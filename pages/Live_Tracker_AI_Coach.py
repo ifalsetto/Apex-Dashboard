@@ -1,4 +1,11 @@
-"""Streamlit page for live Tracker.gg lookup, AI coach, and safe psutil monitor."""
+"""Streamlit page for live Tracker.gg lookup, AI coach, and safe psutil monitor.
+
+This page allows a user to search for an Apex Legends player via the Tracker.gg
+API, display a profile card with key stats, view a monitor snapshot based on
+local process metadata only, generate an AI coaching report, and inspect the
+raw Tracker API response.  API keys are read from `st.secrets` to keep them
+server‑side only.  Fallback data remains visible if the Tracker API fails.
+"""
 from __future__ import annotations
 
 import logging
@@ -14,10 +21,11 @@ from apex_tracker import fetch_tracker_profile, tracker_fallback_profile
 from apex_utils import safe_load_json
 
 logger = logging.getLogger("apex_dashboard")
-APEX_PROCESS_NAMES = {"r5apex", "r5apex.exe"}
 
 
 def find_apex_process() -> Optional[psutil.Process]:
+    """Return the first psutil.Process instance matching known Apex names."""
+    APEX_PROCESS_NAMES = {"r5apex", "r5apex.exe"}
     for proc in psutil.process_iter(["name"]):
         try:
             if (proc.info.get("name") or "").lower() in APEX_PROCESS_NAMES:
@@ -28,6 +36,7 @@ def find_apex_process() -> Optional[psutil.Process]:
 
 
 def read_apex_monitor_snapshot() -> Dict[str, Any]:
+    """Read a snapshot of the local Apex process using psutil metadata only."""
     proc = find_apex_process()
     if not proc:
         return {
@@ -37,7 +46,6 @@ def read_apex_monitor_snapshot() -> Dict[str, Any]:
             "cpu_pct": 0.0,
             "memory_mb": 0.0,
         }
-
     try:
         return {
             "apex_running": True,
@@ -58,6 +66,7 @@ def read_apex_monitor_snapshot() -> Dict[str, Any]:
 
 
 def get_latest_match(profile: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    """Return the most recent performance log from the profile, if any."""
     logs = profile.get("performanceLogs", [])
     if isinstance(logs, list) and logs:
         return logs[-1]
@@ -65,8 +74,8 @@ def get_latest_match(profile: Dict[str, Any]) -> Optional[Dict[str, Any]]:
 
 
 def render_tracker_profile(profile: Dict[str, Any]) -> None:
+    """Render the player's profile card and overview stats strip."""
     left, right = st.columns([1, 2])
-
     with left:
         st.subheader("Profile Card")
         if profile.get("avatar_url"):
@@ -76,7 +85,6 @@ def render_tracker_profile(profile: Dict[str, Any]) -> None:
         st.markdown(f"**Rank:** {profile.get('rank', 'Unranked')}")
         st.markdown(f"**Level:** {profile.get('level', '—')}")
         st.markdown(f"**Legend:** {profile.get('current_legend', '—')}")
-
     with right:
         st.subheader("Overview Strip")
         stats = [
@@ -94,56 +102,64 @@ def render_tracker_profile(profile: Dict[str, Any]) -> None:
 
 
 def main() -> None:
+    """Render the Tracker + AI coach page."""
     st.set_page_config(page_title="Apex Live Tracker + Coach", layout="wide")
     st.title("Apex Live Tracker + Coach")
-    st.caption("Streamlit-native Tracker.gg lookup, local-first AI coach, and safe psutil monitor.")
-
+    st.caption(
+        "Streamlit‑native Tracker.gg lookup, local‑first AI coach, and safe psutil monitor."
+    )
+    # Initialize session state for tracker profile, error and AI report
     if "tracker_profile" not in st.session_state:
         st.session_state.tracker_profile = tracker_fallback_profile(
             query="Apex Player",
-            platform="pc",
+            platform="origin",
             error="No live search yet.",
         )
     if "tracker_last_error" not in st.session_state:
         st.session_state.tracker_last_error = ""
     if "ai_coach_report" not in st.session_state:
         st.session_state.ai_coach_report = None
-
+    # Load autosaved profile if not already attached
     profile = st.session_state.get("profile")
     if not isinstance(profile, dict):
         profile = safe_load_json(config.AUTOSAVE_PATH) or {}
-
+    # Sidebar: player search
     with st.sidebar:
         st.subheader("Search Player")
         query = st.text_input("Player name", value="", placeholder="Example: NotFalsetto")
-        platform = st.selectbox("Platform", ["pc", "psn", "xbl"], index=0)
+        platform = st.selectbox("Platform", ["origin", "psn", "xbl"], index=0)
         if st.button("Search Tracker.gg", width="stretch"):
             result = fetch_tracker_profile(query, platform)
             if result.get("ok"):
                 st.session_state.tracker_profile = result
                 st.session_state.tracker_last_error = ""
             else:
-                st.session_state.tracker_last_error = result.get("error", "Tracker search failed.")
+                st.session_state.tracker_last_error = result.get(
+                    "error", "Tracker search failed."
+                )
                 logger.warning(
                     "Tracker search failed. Keeping fallback data visible: %s",
                     st.session_state.tracker_last_error,
                 )
         if st.session_state.tracker_last_error:
             st.warning(st.session_state.tracker_last_error)
-
+    # Main: render profile card and overview stats
     render_tracker_profile(st.session_state.tracker_profile)
-
+    # Raw payload expander for debugging
+    with st.expander("Raw Tracker Payload", expanded=False):
+        st.json(st.session_state.tracker_profile.get("raw", {}))
+    # Divider
     st.markdown("---")
     monitor = read_apex_monitor_snapshot()
     monitor_col, coach_col = st.columns([1, 2])
-
     with monitor_col:
         st.subheader("Safe Monitor")
         st.metric("Apex running", "Yes" if monitor["apex_running"] else "No")
         st.metric("CPU %", monitor["cpu_pct"])
         st.metric("Memory MB", monitor["memory_mb"])
-        st.caption("Uses psutil process metadata only. No memory reads, injection, macros, or anti-cheat bypass behavior.")
-
+        st.caption(
+            "Uses psutil process metadata only. No memory reads, injection, macros, or anti‑cheat bypass behavior."
+        )
     with coach_col:
         st.subheader("AI Coach Beta")
         if st.button("Generate coach report", width="stretch"):
@@ -154,16 +170,19 @@ def main() -> None:
                 performance_stats=monitor,
                 export_dir=Path(config.EXPORT_DIR) / "reports",
             )
-
         report = st.session_state.ai_coach_report
         if report:
-            st.caption(f"Source: {report.get('source', 'unknown')} • Created: {report.get('createdISO', '—')}")
+            st.caption(
+                f"Source: {report.get('source', 'unknown')} • Created: {report.get('createdISO', '—')}"
+            )
             if report.get("summary"):
                 st.write(report["summary"])
             for item in report.get("suggestions", []) or []:
                 st.markdown(f"- {item}")
         else:
-            st.info("Generate a report after searching a player or logging a match. If OpenAI is unavailable, a local fallback report is generated.")
+            st.info(
+                "Generate a report after searching a player or logging a match. If OpenAI is unavailable, a local fallback report is generated."
+            )
 
 
 if __name__ == "__main__":
