@@ -125,7 +125,27 @@ def update_capture_notes(con: sqlite3.Connection, capture_id: str, notes: str) -
 
 
 def insert_match(con: sqlite3.Connection, row: Dict[str, Any]) -> None:
-    cols = ",".join(row.keys())
-    qs = ",".join(["?"] * len(row))
-    con.execute(f"INSERT INTO match_logs ({cols}) VALUES ({qs})", tuple(row.values()))
+    con.execute(
+        """
+        INSERT INTO match_logs (
+            id, played_at, mode, map, ping_ms, kills, assists, damage,
+            placement, notes, run_id, capture_id, settings_json
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            row.get("id"),
+            row.get("played_at"),
+            row.get("mode"),
+            row.get("map"),
+            row.get("ping_ms"),
+            row.get("kills"),
+            row.get("assists"),
+            row.get("damage"),
+            row.get("placement"),
+            row.get("notes"),
+            row.get("run_id"),
+            row.get("capture_id"),
+            row.get("settings_json"),
+        ),
+    )
     con.commit()
