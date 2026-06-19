@@ -657,6 +657,7 @@ export default function App() {
   const [selectedSession, setSelectedSession] = useState(DEFAULT_SESSIONS[0].id);
   const [musicVisible, setMusicVisible] = useState(true);
   const [spotifyEmbedUrl, setSpotifyEmbedUrl] = useState('');
+  const safeSpotifyEmbedUrl = sanitizeSpotifyEmbedUrl(spotifyEmbedUrl);
   const [demoSubscribed, setDemoSubscribed] = useState(false);
   const [demoAddedSong, setDemoAddedSong] = useState(false);
   const [demoSharedApp, setDemoSharedApp] = useState(false);
@@ -955,11 +956,11 @@ export default function App() {
                 {musicVisible ? <button className="button" onClick={() => setMusicVisible(false)}>Hide Player</button> : null}
               </div>
               {musicVisible ? (
-                spotifyEmbedUrl ? (
+                safeSpotifyEmbedUrl ? (
                   <div className="spotify-wrap">
                     <iframe
                       title="FalseTech Spotify Player"
-                      src={spotifyEmbedUrl}
+                      src={safeSpotifyEmbedUrl}
                       width="100%"
                       height="352"
                       allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
@@ -1241,6 +1242,27 @@ export default function App() {
       </main>
     </div>
   );
+}
+
+function sanitizeSpotifyEmbedUrl(value: string): string {
+  if (!value) {
+    return '';
+  }
+
+  try {
+    const parsed = new URL(value);
+    const isHttps = parsed.protocol === 'https:';
+    const isSpotifyHost = parsed.hostname === 'open.spotify.com';
+    const isEmbedPath = parsed.pathname.startsWith('/embed/');
+
+    if (isHttps && isSpotifyHost && isEmbedPath) {
+      return parsed.toString();
+    }
+  } catch {
+    return '';
+  }
+
+  return '';
 }
 
 function Info({ title, text }: { title: string; text: string }) {
