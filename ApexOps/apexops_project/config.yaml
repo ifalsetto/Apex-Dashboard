@@ -1,0 +1,50 @@
+# ApexOps local configuration
+# - Keep this file in the same folder as run_dashboard.bat
+# - You can edit values anytime; the dashboard reads it live.
+
+paths:
+  # CapFrameX capture folder (default)
+  capframex_captures_dir: "%USERPROFILE%\\Documents\\CapFrameX\\Captures"
+
+  # Apex config folder (default)
+  apex_local_config_dir: "%USERPROFILE%\\Saved Games\\Respawn\\Apex\\local"
+
+  # Where ApexOps stores its database + exports
+  data_dir: "C:\\FalseTech\\1-Apex\\Logs"
+
+  # SQLite database path (inside data_dir recommended)
+  db_path: "{data_dir}\\apexops.db"
+
+collector:
+  # How often to scan for new captures (seconds)
+  scan_interval_sec: 5
+
+  # Also track Apex runs by watching for the r5apex.exe process
+  track_apex_process: true
+
+  # Capture file extensions to import
+  capture_extensions:
+    - .json
+    - .json.gz
+    - .csv
+
+profile:
+  # Human-readable profile name you are testing (used for comparisons)
+  profile_name: "Competitive_SDR"
+
+  # Display mode label (we don't auto-detect HDR reliably; set this yourself)
+  display_mode: "SDR"
+
+  # Your intended refresh rate (ApexOps will also log the *actual* current Hz from Windows)
+  monitor_target_hz: 240
+
+  # NVIDIA / Apex sync chain (user-declared values)
+  gsync: "fullscreen"
+  nvcp_vsync: "on"
+  nvcp_max_fps: 237
+  nvcp_low_latency_mode: "off"
+  apex_vsync: "off"
+  apex_reflex: "enabled+boost"
+
+  # Notes you want recorded on every capture
+  notes_default: ""

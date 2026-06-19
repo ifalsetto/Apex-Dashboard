@@ -1,0 +1,7 @@
+name = "falsetech-apex-tracker-proxy"
+main = "src/index.ts"
+compatibility_date = "2026-04-22"
+workers_dev = true
+
+[vars]
+ALLOWED_ORIGINS = "http://localhost:5173"
