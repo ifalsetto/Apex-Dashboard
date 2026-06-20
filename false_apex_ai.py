@@ -46,8 +46,9 @@ def safe_save_json(path: Path, data: Mapping[str, Any]) -> None:
     tmp.replace(path)
 
 
-def load_dashboard_profile(repo_root: Optional[Path] = None) -> Tuple[Dict[str, Any], Path]:
-    root = repo_root or find_repo_root()
+def load_dashboard_profile(data_root: Optional[Path] = None) -> Tuple[Dict[str, Any], Path]:
+    """Load the dashboard autosave profile from the runtime data directory."""
+    root = (data_root or find_repo_root()).resolve()
     path = root / PROFILE_AUTOSAVE_FILE
     return safe_load_json(path) or {}, path
 
@@ -253,10 +254,11 @@ def append_report_to_profile(
     return profile
 
 
-def save_report_markdown(repo_root: Path, report: str) -> Path:
+def save_report_markdown(data_root: Path, report: str) -> Path:
+    """Save an AI coach report under the runtime data directory."""
     day = dt.date.today().isoformat()
     timestamp = dt.datetime.now().strftime("%Y%m%d_%H%M%S")
-    output_dir = repo_root / AI_REPORTS_DIR / day
+    output_dir = data_root.resolve() / AI_REPORTS_DIR / day
     output_dir.mkdir(parents=True, exist_ok=True)
     output_path = output_dir / f"apex_ai_coach_{timestamp}.md"
     output_path.write_text(report + "\n", encoding="utf-8")
