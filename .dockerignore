@@ -29,6 +29,16 @@ _TRASH_BIN
 StorageMap
 profile_autosave.json
 profile_index.json
+AI_Coach_Reports
+
+# Local/runtime state that should never be baked into images.
+data/network/
+ApexOps/apexops_project/apexops/1-Apex/Logs/
+FalseTech-Apex-Trial/backend/.wrangler/
+*.sqlite
+*.sqlite3
+*.db
+
 apex_dashboard_source.zip
 pip-freeze.txt
 local-freeze.txt
