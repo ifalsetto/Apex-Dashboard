@@ -5,6 +5,7 @@ from pathlib import Path
 import streamlit as st
 import performance_patch  # apply performance patches
 
+from apex_config import config
 from false_apex_ai import (
     OPENAI_MODEL_DEFAULT,
     append_report_to_profile,
@@ -24,6 +25,8 @@ st.set_page_config(
 )
 
 REPO_ROOT = find_repo_root(Path(__file__).resolve())
+DATA_ROOT = config.DATA_DIR
+config.ensure_directories()
 CSS_PATH = REPO_ROOT / "assets" / "false_apex_ai_coach.css"
 
 if CSS_PATH.exists():
@@ -42,7 +45,7 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-profile, profile_path = load_dashboard_profile(REPO_ROOT)
+profile, profile_path = load_dashboard_profile(DATA_ROOT)
 
 left, center, right = st.columns(3)
 with left:
@@ -116,9 +119,10 @@ if st.button("Generate AI Coach Report", type="primary", width="stretch"):
             model=selected_model,
         )
         safe_save_json(profile_path, updated_profile)
-        report_path = save_report_markdown(REPO_ROOT, report)
+        report_path = save_report_markdown(DATA_ROOT, report)
+        saved_label = report_path.relative_to(DATA_ROOT)
 
-        st.info(f"Saved report: `{report_path.relative_to(REPO_ROOT)}`")
+        st.info(f"Saved report: `{saved_label}`")
         st.download_button(
             "Download Report",
             data=report.encode("utf-8"),
