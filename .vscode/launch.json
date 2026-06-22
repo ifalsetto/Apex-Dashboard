@@ -7,9 +7,17 @@
         {
             "type": "chrome",
             "request": "launch",
-            "name": "Launch Chrome against localhost",
-            "url": "http://localhost:8080",
+            "name": "Launch Chrome against local dev server",
+            "url": "http://localhost:${input:devServerPort}",
             "webRoot": "${workspaceFolder}"
+        }
+    ],
+    "inputs": [
+        {
+            "id": "devServerPort",
+            "type": "promptString",
+            "description": "Local dev server port for this workspace, for example 5173 for Vite or 8080 for other dev servers.",
+            "default": "8080"
         }
     ]
 }
