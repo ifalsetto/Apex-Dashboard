@@ -1,0 +1,1 @@
+PR still needs to be opened manually if connector PR creation is unavailable.
