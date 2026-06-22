@@ -1,0 +1,1 @@
+This directory stores reusable FalseTech container templates.
