@@ -46,15 +46,10 @@ export default {
     }
 
     if (request.method !== 'GET') {
-      return errorResponse(request, env, 405, 'METHOD_NOT_ALLOWED', 'Method not allowed', { path: url.pathname });
-    }
-
-    if (!env.TRN_API_KEY) {
-      return errorResponse(request, env, 500, 'MISSING_API_KEY', 'Server missing TRN_API_KEY', { path: url.pathname });
-    }
-
-    if (!isOriginAllowed(request, env)) {
-      return errorResponse(request, env, 403, 'ORIGIN_NOT_ALLOWED', 'Origin not allowed', { path: url.pathname });
+      return errorResponse(request, env, 405, 'METHOD_NOT_ALLOWED', 'Method not allowed', {
+        path: url.pathname,
+        fetchedAt: new Date().toISOString()
+      });
     }
 
     if (url.pathname === '/health') {
@@ -64,9 +59,24 @@ export default {
         cached: false,
         data: {
           service: 'falsetech-apex-tracker-proxy',
+          trackerConfigured: Boolean(env.TRN_API_KEY),
           now: new Date().toISOString()
         },
         meta: { path: url.pathname, fetchedAt: new Date().toISOString() }
+      });
+    }
+
+    if (!env.TRN_API_KEY) {
+      return errorResponse(request, env, 503, 'TRACKER_NOT_CONFIGURED', 'Tracker integration is not configured', {
+        path: url.pathname,
+        fetchedAt: new Date().toISOString()
+      });
+    }
+
+    if (!isOriginAllowed(request, env)) {
+      return errorResponse(request, env, 403, 'ORIGIN_NOT_ALLOWED', 'Origin not allowed', {
+        path: url.pathname,
+        fetchedAt: new Date().toISOString()
       });
     }
 
