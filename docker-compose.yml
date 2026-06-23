@@ -24,11 +24,10 @@ services:
       start_period: 20s
 
   frontend:
-  apex-dashboard:
     build:
-      context: .
+      context: ./FalseTech-Apex-Trial/frontend
       dockerfile: Dockerfile
-    image: falsetech/apex-dashboard:local
+    image: falsetech/apex-dashboard-frontend:local
     restart: unless-stopped
     depends_on:
       backend:
@@ -41,6 +40,12 @@ services:
       timeout: 5s
       retries: 5
       start_period: 10s
+
+  apex-dashboard:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: falsetech/apex-dashboard:local
     container_name: apex-dashboard
     restart: unless-stopped
     ports:
