@@ -1,0 +1,39 @@
+services:
+  local-ai-api:
+    build:
+      context: ./ai-api
+      dockerfile: Dockerfile
+    image: falsetech/local-ai-api:local
+    restart: unless-stopped
+    ports:
+      - "8010:8000"
+    environment:
+      FALSETECH_AI_DATA_DIR: /data
+      FALSETECH_MODEL_DIR: /models
+    volumes:
+      - local_ai_data:/data
+      - ./models:/models:ro
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=5).read()"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+  local-ai-worker:
+    build:
+      context: ./ai-worker
+      dockerfile: Dockerfile
+    image: falsetech/local-ai-worker:local
+    restart: unless-stopped
+    environment:
+      FALSETECH_AI_DATA_DIR: /data
+      FALSETECH_AI_API_URL: http://local-ai-api:8000
+    volumes:
+      - local_ai_data:/data
+    depends_on:
+      local-ai-api:
+        condition: service_healthy
+
+volumes:
+  local_ai_data:
