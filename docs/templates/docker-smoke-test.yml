@@ -1,0 +1,28 @@
+name: Docker Smoke Test
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  docker-smoke-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate Compose config
+        run: docker compose config
+
+      - name: Build images
+        run: docker compose build
+
+      - name: Start stack
+        run: docker compose up -d
+
+      - name: Check running containers
+        run: docker compose ps
+
+      - name: Stop stack
+        if: always()
+        run: docker compose down -v

@@ -26,6 +26,9 @@ on:
       - pages/**
       - .github/workflows/docker-smoke.yml
 
+permissions:
+  contents: read
+
 jobs:
   docker-smoke:
     runs-on: ubuntu-latest
