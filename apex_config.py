@@ -1,7 +1,8 @@
 """Configuration module for Apex Dashboard."""
+import os
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, Any, Optional
+from typing import Any, Dict, Optional
 import datetime as dt
 import platform
 import json
@@ -19,31 +20,45 @@ class Config:
     FEATURE_URL: str = field(default_factory=lambda: f"{Config.REPO_URL}/issues/new?template=feature_request.yml")
 
     # Process names
-    APEX_PROCESS_NAMES: list = field(default_factory=lambda: ["r5apex", "r5apex.exe"])
+    # Process-only detection is intentionally read-only. It checks whether the
+    # local Windows process list contains Apex Legends and does not inspect game
+    # memory, automate input, modify files, or interact with anti-cheat systems.
+    APEX_PROCESS_NAMES: list = field(default_factory=lambda: [
+        "r5apex",
+        "r5apex.exe",
+        "r5apex_dx12",
+        "r5apex_dx12.exe",
+    ])
+    APEX_PROCESS_PREFIXES: list = field(default_factory=lambda: ["r5apex"])
 
-    # Base directory
+    # Source/app directory. This stays pointed at the checked-out code.
     BASE_DIR: Path = field(default_factory=lambda: Path(__file__).parent)
+
+    # Runtime data directory. Defaults to the app directory for backward
+    # compatibility, but Docker/Compose can set APEX_DASHBOARD_DATA_DIR=/data
+    # so snapshots, exports, autosaves, and temp files survive container rebuilds.
+    DATA_DIR: Path = field(default_factory=lambda: Path(os.environ.get("APEX_DASHBOARD_DATA_DIR", Path(__file__).parent)).resolve())
 
     # Auto-derived paths
     @property
     def SNAP_DIR(self) -> Path:
-        return self.BASE_DIR / "Snapshots"
+        return self.DATA_DIR / "Snapshots"
 
     @property
     def SCAN_DIR(self) -> Path:
-        return self.BASE_DIR / "Scans"
+        return self.DATA_DIR / "Scans"
 
     @property
     def EXPORT_DIR(self) -> Path:
-        return self.BASE_DIR / "Exports"
+        return self.DATA_DIR / "Exports"
 
     @property
     def PROFILES_DIR(self) -> Path:
-        return self.BASE_DIR / "Profiles"
+        return self.DATA_DIR / "Profiles"
 
     @property
     def TEMPBIN_DIR(self) -> Path:
-        return self.BASE_DIR / "TempBin"
+        return self.DATA_DIR / "TempBin"
 
     @property
     def TODAY_STR(self) -> str:
@@ -55,7 +70,7 @@ class Config:
 
     @property
     def TRASHBIN_DIR(self) -> Path:
-        return self.BASE_DIR / "_TRASH_BIN"
+        return self.DATA_DIR / "_TRASH_BIN"
 
     @property
     def TRASH_TODAY_DIR(self) -> Path:
@@ -63,7 +78,7 @@ class Config:
 
     @property
     def STORAGE_DIR(self) -> Path:
-        return self.BASE_DIR / "StorageMap"
+        return self.DATA_DIR / "StorageMap"
 
     @property
     def STORAGE_MAP_JSON(self) -> Path:
@@ -75,15 +90,16 @@ class Config:
 
     @property
     def INDEX_PATH(self) -> Path:
-        return self.BASE_DIR / "profile_index.json"
+        return self.DATA_DIR / "profile_index.json"
 
     @property
     def AUTOSAVE_PATH(self) -> Path:
-        return self.BASE_DIR / "profile_autosave.json"
+        return self.DATA_DIR / "profile_autosave.json"
 
     def ensure_directories(self) -> None:
         """Create all necessary directories."""
         for path in [
+            self.DATA_DIR,
             self.SNAP_DIR,
             self.SCAN_DIR,
             self.EXPORT_DIR,

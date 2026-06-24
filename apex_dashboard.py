@@ -1,6 +1,6 @@
 """Apex Optimizer Dashboard - Refactored main application."""
-                    import json
-                    import os
+import json
+import os
 import csv
 import hashlib
 import datetime as dt
@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Dict, Any, Tuple, List, Optional
 from streamlit_autorefresh import st_autorefresh
 import streamlit as st
+from apex_api_status import render_api_status_panel
 
 # Import refactored modules
 from apex_config import config, Config
@@ -239,10 +240,26 @@ def save_unique_json(folder: str, obj: Dict[str, Any], reason: str, prefix: str)
 
         ts = dt.datetime.now().strftime("%Y%m%d_%H%M%S")
         name = slug(obj.get("meta", {}).get("profileName", "profile")) if isinstance(obj, dict) else "object"
+        if not name or not re.fullmatch(r"[A-Za-z0-9_-]+", name):
+            logger.warning("Invalid profile name for filename; using safe fallback.")
+            name = "profile"
         r = slug(reason) if reason else "snapshot"
-        filename = f"{prefix}_{name}_{ts}_{r}.json"
-        path = os.path.join(folder, filename)
+        if not r or not re.fullmatch(r"[A-Za-z0-9_-]+", r):
+            r = "snapshot"
+        safe_prefix = slug(prefix) if prefix else "snapshot"
+        if not safe_prefix or not re.fullmatch(r"[A-Za-z0-9_-]+", safe_prefix):
+            safe_prefix = "snapshot"
+        filename = f"{safe_prefix}_{name}_{ts}_{r}.json"
 
+        base_dir = Path(folder).resolve()
+        path_obj = (base_dir / filename).resolve()
+        try:
+            path_obj.relative_to(base_dir)
+        except ValueError:
+            logger.warning(f"Blocked path traversal attempt: {path_obj}")
+            return False, ""
+
+        path = str(path_obj)
         safe_save_json(path, obj)
         idx["hash_to_file"][h] = path
         save_index(idx)
@@ -333,16 +350,31 @@ def ps_run(cmd: str) -> str:
 
 
 def apex_process_running() -> bool:
-    """Check if Apex process is running."""
+    """Check if any Apex Legends process is running.
+
+    Process-only detection.
+    Matches r5apex, r5apex.exe, r5apex_dx12, and future r5apex* variants.
+    """
+    try:
+        import psutil
+
+        for proc in psutil.process_iter(["name"]):
+            name = (proc.info.get("name") or "").lower().replace(".exe", "")
+            if name.startswith("r5apex"):
+                return True
+    except Exception as exc:
+        logger.debug(f"psutil Apex process check failed: {exc}")
+
     check = r"""
-$names = @('r5apex','r5apex.exe')
-$found = $false
-foreach ($n in $names) {
-  try { if (Get-Process -Name $n -ErrorAction Stop) { $found = $true } } catch {}
+try {
+    $p = Get-Process | Where-Object { $_.ProcessName -like 'r5apex*' } | Select-Object -First 1
+    if ($p) { '1' } else { '0' }
+} catch {
+    '0'
 }
-if ($found) { '1' } else { '0' }
 """
     return ps_run(check) == "1"
+
 
 
 def get_foreground_window_info() -> Dict[str, str]:
@@ -378,25 +410,57 @@ try { $pname = (Get-Process -Id $pid -ErrorAction Stop).ProcessName } catch {}
 
 
 def get_apex_cpu_pct_sample(window_s: float = 0.5) -> float:
-    """Sample Apex process CPU usage."""
+    """Sample Apex process CPU usage using process-only detection."""
+    try:
+        import psutil
+
+        apex_proc = None
+        for proc in psutil.process_iter(["name"]):
+            name = (proc.info.get("name") or "").lower().replace(".exe", "")
+            if name.startswith("r5apex"):
+                apex_proc = proc
+                break
+
+        if apex_proc is None:
+            return 0.0
+
+        apex_proc.cpu_percent(interval=None)
+        time.sleep(max(0.2, window_s))
+        pct = apex_proc.cpu_percent(interval=None)
+
+        cores = os.cpu_count() or 1
+        normalized = pct / cores
+
+        return max(0.0, min(100.0, normalized))
+
+    except Exception as exc:
+        logger.debug(f"Failed to sample Apex CPU via psutil: {exc}")
+
     script1 = r"""
-try { $p = Get-Process -Name r5apex -ErrorAction Stop; "{0}" -f $p.CPU } catch { "" }
+try {
+    $p = Get-Process | Where-Object { $_.ProcessName -like 'r5apex*' } | Select-Object -First 1
+    if ($p) { "{0}" -f $p.CPU } else { "" }
+} catch { "" }
 """
     a = ps_run(script1)
     time.sleep(max(0.2, window_s))
     b = ps_run(script1)
+
     try:
         if not a or not b:
             return 0.0
+
         cpu_a = float(a)
         cpu_b = float(b)
         delta_cpu_s = max(0.0, cpu_b - cpu_a)
         cores = os.cpu_count() or 1
         pct = (delta_cpu_s / window_s) * 100.0 / cores
+
         return max(0.0, min(100.0, pct))
-    except (ValueError, TypeError):
-        logger.debug("Failed to compute CPU percentage")
+
+    except Exception:
         return 0.0
+
 
 
 def ping_sample(host: str = "1.1.1.1", count: int = 10) -> Tuple[Optional[int], Optional[float]]:
@@ -431,54 +495,67 @@ def ping_sample(host: str = "1.1.1.1", count: int = 10) -> Tuple[Optional[int], 
 
 # -------------------- Match Monitor (heuristic) --------------------
 def monitor_tick(state: MonitorState) -> MonitorState:
-    """Update match monitor state."""
-    tick_ts = now_iso()
-    fg = get_foreground_window_info()
-    apex_running = apex_process_running()
-    apex_foreground = apex_running and (fg.get("process", "").lower() == "r5apex")
+    """Update monitor state using process-only detection.
 
-    state.setdefault("fg_streak", 0)
-    state.setdefault("bg_streak", 0)
+    Rules:
+    - If r5apex* starts running, begin monitoring.
+    - If r5apex* remains running, keep monitoring.
+    - If r5apex* closes, end monitoring and allow log creation.
+    """
+    tick_ts = now_iso()
+
+    previous_running = bool(state.get("apex_running", False))
+    previous_in_match = bool(state.get("in_match", False))
+
+    apex_running = apex_process_running()
+
     state.setdefault("in_match", False)
     state.setdefault("match_startISO", "")
     state.setdefault("match_endISO", "")
     state.setdefault("cpu_samples", [])
     state.setdefault("cpu_peak", 0.0)
+    state.setdefault("last_status", "Waiting for Apex process")
 
     cpu_pct = 0.0
+
     if apex_running:
         cpu_pct = get_apex_cpu_pct_sample(0.35)
-        state["cpu_samples"].append(cpu_pct)
-        state["cpu_peak"] = max(state.get("cpu_peak", 0.0), cpu_pct)
 
-    if apex_foreground:
-        state["fg_streak"] += 1
-        state["bg_streak"] = 0
-    else:
-        state["bg_streak"] += 1
-        state["fg_streak"] = 0
-
-    START_STREAK = safe_int(state.get("start_streak_needed"), 3)
-    END_STREAK = safe_int(state.get("end_streak_needed"), 6)
-
-    if (not state["in_match"]) and apex_foreground and state["fg_streak"] >= START_STREAK:
+    # Apex just started, or app opened while Apex is already running.
+    if apex_running and not previous_in_match:
         state["in_match"] = True
         state["match_startISO"] = tick_ts
         state["match_endISO"] = ""
         state["cpu_samples"] = []
         state["cpu_peak"] = 0.0
+        state["last_status"] = "Apex process detected. Monitoring started."
 
-    if state["in_match"]:
-        if (not apex_running) or (not apex_foreground and state["bg_streak"] >= END_STREAK):
-            state["in_match"] = False
-            state["match_endISO"] = tick_ts
+    # Apex is still running.
+    if apex_running and state.get("in_match"):
+        state["cpu_samples"].append(cpu_pct)
+        state["cpu_peak"] = max(float(state.get("cpu_peak", 0.0)), cpu_pct)
+        state["last_status"] = "Apex process running. Monitoring active."
+
+    # Apex just closed.
+    if (not apex_running) and previous_running and previous_in_match:
+        state["in_match"] = False
+        state["match_endISO"] = tick_ts
+        state["last_status"] = "Apex process closed. Monitoring ended."
+
+    # Apex is not running and no active session exists.
+    if (not apex_running) and (not state.get("in_match")) and not state.get("match_endISO"):
+        state["last_status"] = "Waiting for Apex process."
 
     state["last_tickISO"] = tick_ts
     state["apex_running"] = apex_running
-    state["apex_foreground"] = apex_foreground
-    state["fg_title"] = fg.get("title", "")
-    state["fg_process"] = fg.get("process", "")
+    state["apex_foreground"] = False
+    state["fg_title"] = ""
+    state["fg_process"] = "r5apex*" if apex_running else ""
+    state["fg_streak"] = 0
+    state["bg_streak"] = 0
+
     return state
+
 
 
 def compute_cpu_stats(samples: List[float]) -> Tuple[float, float]:
@@ -720,8 +797,8 @@ def dir_stats(root: str, max_files: int = 25000) -> Dict[str, Any]:
                     m = dt.datetime.fromtimestamp(stt.st_mtime).isoformat(timespec="seconds")
                     if not newest_iso or m > newest_iso:
                         newest_iso = m
-                    if not oldest_iso or m < oldest_iso:
-                        oldest_iso = m
+                        if not oldest_iso or m < oldest_iso:
+                            oldest_iso = m
                 except Exception as e:
                     logger.debug(f"Failed to stat {fp}: {e}")
             if truncated:
@@ -858,17 +935,91 @@ def parse_presentmon_csv(file_bytes: bytes) -> Dict[str, Any]:
         return {"ok": False, "error": str(e)}
 
 
+
+# -------------------- System Health --------------------
+def runtime_secret_available(name: str) -> bool:
+    """Check whether a runtime secret/env var exists without exposing the value."""
+    try:
+        value = st.secrets.get(name, "")
+    except Exception:
+        value = os.environ.get(name, "")
+    return bool(str(value).strip())
+
+
+def bool_status(value: bool) -> str:
+    """Readable status label."""
+    return "Ready" if value else "Missing"
+
+
+def render_system_health_panel(profile: Dict[str, Any]) -> None:
+    """Render a compact system health panel in the sidebar."""
+    with st.expander("System Health", expanded=True):
+        st.caption("Live app status, secrets, storage, and profile state.")
+
+        app_col, version_col = st.columns(2)
+        app_col.metric("App", "Live")
+        version_col.metric("Version", APP_VERSION)
+
+        secret_col_a, secret_col_b = st.columns(2)
+        openai_ready = runtime_secret_available("OPENAI_API_KEY")
+        tracker_ready = runtime_secret_available("TRACKER_API_KEY")
+
+        secret_col_a.metric("OpenAI", bool_status(openai_ready))
+        secret_col_b.metric("Tracker", bool_status(tracker_ready))
+
+        profile_meta = profile.get("meta", {}) if isinstance(profile, dict) else {}
+        profile_logs = profile.get("performanceLogs", []) if isinstance(profile, dict) else []
+
+        st.write("**Profile**")
+        st.caption(f"Name: {profile_meta.get('profileName', 'Unknown')}")
+        st.caption(f"Updated: {profile_meta.get('lastUpdatedISO', 'Unknown')}")
+        st.caption(f"Match logs: {len(profile_logs) if isinstance(profile_logs, list) else 0}")
+
+        storage_rows = []
+        for label, folder in [
+            ("Autosave", Path(AUTOSAVE_PATH).parent),
+            ("Snapshots", Path(SNAP_DIR)),
+            ("Exports", Path(EXPORT_DIR)),
+            ("Profiles", Path(PROFILES_DIR)),
+            ("Storage", Path(STORAGE_DIR)),
+        ]:
+            storage_rows.append({
+                "Area": label,
+                "Ready": folder.exists(),
+            })
+
+        st.write("**Storage**")
+        st.dataframe(storage_rows, width="stretch", hide_index=True)
+
+        if not openai_ready:
+            st.warning("OPENAI_API_KEY missing in Streamlit Secrets.")
+        if not tracker_ready:
+            st.warning("TRACKER_API_KEY missing or blank in Streamlit Secrets.")
+        st.link_button("Open GitHub Repo", REPO_URL, width="stretch")
+
+
 # ============== STREAMLIT UI ==============
 st.set_page_config(page_title=APP_TITLE, layout="wide")
 
+# FALSETECH_THEME_START
+THEME_CSS_PATH = Path(BASE_DIR) / "assets" / "falsetech_theme.css"
+if THEME_CSS_PATH.exists():
+    st.markdown(f"<style>{THEME_CSS_PATH.read_text(encoding='utf-8')}</style>", unsafe_allow_html=True)
+# FALSETECH_THEME_END
+
+
 with st.sidebar:
+    st.markdown(
+        '<div class="ft-brand-pill"><span class="ft-brand-dot"></span>FalseTech Apex</div>',
+        unsafe_allow_html=True,
+    )
     st.markdown("### Apex Dashboard")
     st.caption(f"Version: {APP_VERSION}")
-    st.link_button("Report a bug", BUG_URL, use_container_width=True)
-    st.link_button("Request a feature", FEATURE_URL, use_container_width=True)
     st.markdown("---")
-    st.markdown("**Repo**")
-    st.markdown(f"[Apex-Dashboard]({REPO_URL})")
+    st.markdown("**Official Links**")
+    st.link_button("GitHub Repo", REPO_URL, width="stretch")
+    st.link_button("Report a bug", BUG_URL, width="stretch")
+    st.link_button("Request a feature", FEATURE_URL, width="stretch")
 
 st.info("Beta: reproduce once → click Report a bug → paste steps + screenshot.", icon="🧪")
 
@@ -905,16 +1056,739 @@ if "storage_map" not in st.session_state:
 
 profile: Profile = st.session_state.profile
 
+with st.sidebar:
+    render_system_health_panel(profile)
+
 # ============== Header ==============
 st.title(APP_TITLE)
+# APEX_API_STATUS_PANEL_START
+try:
+    render_api_status_panel()
+except Exception as exc:
+    st.warning(f"API status panel unavailable: {exc}")
+# APEX_API_STATUS_PANEL_END
 st.caption(
     f"v{APP_VERSION} • Profile: {profile['meta']['profileName']} • "
     f"Updated: {profile['meta']['lastUpdatedISO']}"
 )
 
-# ... rest of UI code follows same structure as original ...
-# (Due to token limits, showing main improvements above)
-# The rest would include all tab implementations with the same logic
+
+# ============== Dashboard Body ==============
+
+profile.setdefault("meta", {})
+profile.setdefault("targets", {})
+profile.setdefault("toggles", {})
+profile.setdefault("launchOptions", [])
+profile.setdefault("performanceLogs", [])
+profile.setdefault("network", {})
+profile.setdefault("hdrSetup", DEFAULT_PROFILE.get("hdrSetup", {}))
+profile.setdefault("presets", DEFAULT_PROFILE.get("presets", {}))
+
+top_a, top_b, top_c, top_d = st.columns(4)
+top_a.metric("Refresh Target", f"{profile['targets'].get('refreshHz', '?')} Hz")
+top_b.metric("FPS Target", profile["targets"].get("fpsTarget", "?"))
+top_c.metric("Latency Goal", f"{profile['targets'].get('latencyGoalMs', '?')} ms")
+top_d.metric("HDR Mode", hdr_method_label(profile.get("toggles", {})))
+
+tabs = st.tabs([
+    UI["tabs"]["apex"],
+    "Tracker",
+    UI["tabs"]["hdr"],
+    UI["tabs"]["presets"],
+    UI["tabs"]["match"],
+    UI["tabs"]["perf"],
+    UI["tabs"]["net"],
+    UI["tabs"]["storage"],
+    UI["tabs"]["library"],
+])
+
+with tabs[0]:
+    st.subheader("Competitive Setup")
+
+    st.info(
+        "Local one-click import works when this dashboard is running on your Windows PC. "
+        "The live Streamlit Cloud app cannot directly read your computer.",
+    )
+
+    try:
+        from apex_local_importer import (
+            apply_setup_settings_to_profile,
+            collect_local_setup_settings,
+        )
+    except Exception as exc:
+        st.warning(f"Local setup importer unavailable: {exc}")
+    else:
+        if st.button("Import Local PC / Display Settings", width="stretch"):
+            result = collect_local_setup_settings()
+
+            if not result.get("ok"):
+                st.warning(result.get("error", "Local setup import failed."))
+            else:
+                imported_setup = result.get("data", {})
+                st.session_state.last_local_setup_import = imported_setup
+                st.session_state.profile = apply_setup_settings_to_profile(profile, imported_setup)
+                st.success("Local PC/display settings imported.")
+                st.toast("Setup imported.")
+                st.rerun()
+
+        if st.session_state.get("last_local_setup_import"):
+            with st.expander("Last imported setup data", expanded=False):
+                st.json(st.session_state.last_local_setup_import)
+
+
+    left, right = st.columns([1, 1])
+
+    with left:
+        profile["meta"]["profileName"] = st.text_input(
+            UI["labels"]["profile_name"],
+            value=str(profile["meta"].get("profileName", "")),
+        )
+        profile["meta"]["monitor"] = st.text_input(
+            "Monitor",
+            value=str(profile["meta"].get("monitor", "")),
+        )
+        profile["meta"]["gpu"] = st.text_input(
+            "GPU",
+            value=str(profile["meta"].get("gpu", "")),
+        )
+        profile["meta"]["notes"] = st.text_area(
+            UI["labels"]["notes"],
+            value=str(profile["meta"].get("notes", "")),
+            height=110,
+        )
+
+    with right:
+        refresh = st.number_input(
+            UI["labels"]["refresh"],
+            min_value=30,
+            max_value=360,
+            value=safe_int(profile["targets"].get("refreshHz", 240), 240, 30, 360),
+            step=1,
+        )
+        profile["targets"]["refreshHz"] = validate_refresh_hz(int(refresh))
+
+        fps_target = st.number_input(
+            UI["labels"]["fps_target"],
+            min_value=30,
+            max_value=500,
+            value=safe_int(profile["targets"].get("fpsTarget", 237), 237, 30, 500),
+            step=1,
+        )
+        profile["targets"]["fpsTarget"] = validate_fps_target(int(fps_target), int(refresh))
+
+        latency_goal = st.number_input(
+            UI["labels"]["latency"],
+            min_value=1,
+            max_value=100,
+            value=safe_int(profile["targets"].get("latencyGoalMs", 10), 10, 1, 100),
+            step=1,
+        )
+        profile["targets"]["latencyGoalMs"] = int(latency_goal)
+
+    st.divider()
+    st.subheader(UI["labels"]["launch"])
+
+    for i, opt in enumerate(profile.get("launchOptions", [])):
+        if not isinstance(opt, dict):
+            continue
+        cols = st.columns([1, 2, 4])
+        with cols[0]:
+            opt["enabled"] = st.checkbox("On", value=bool(opt.get("enabled")), key=f"launch_enabled_{i}")
+        with cols[1]:
+            opt["key"] = st.text_input("Flag", value=str(opt.get("key", "")), key=f"launch_key_{i}")
+        with cols[2]:
+            opt["note"] = st.text_input("Note", value=str(opt.get("note", "")), key=f"launch_note_{i}")
+
+    st.code(build_launch_string(profile.get("launchOptions", [])), language="text")
+
+    if st.button("Add launch option"):
+        profile["launchOptions"].append({"key": "", "enabled": False, "note": ""})
+        st.rerun()
+
+    st.divider()
+    st.subheader("Import System Report")
+    st.caption("Upload a DxDiag .txt report to import safe system, display, GPU, and driver information.")
+
+    try:
+        from apex_system_importer import (
+            LOCAL_DXDIAG_HELPER_PS1,
+            apply_system_report_to_profile,
+            build_import_rows,
+            parse_dxdiag_text,
+        )
+    except Exception as exc:
+        st.error(f"System report importer unavailable: {exc}")
+    else:
+        with st.expander("How to create a DxDiag report", expanded=False):
+            st.write("Run this on your Windows gaming PC, then upload the created text file here.")
+            st.code('dxdiag /t "$env:USERPROFILE\\Desktop\\dxdiag_apex.txt"', language="powershell")
+            st.download_button(
+                "Download local DxDiag helper script",
+                data=LOCAL_DXDIAG_HELPER_PS1.encode("utf-8"),
+                file_name="generate_dxdiag_apex.ps1",
+                mime="text/plain",
+                width="stretch",
+            )
+
+        uploaded_dxdiag = st.file_uploader(
+            "Upload DxDiag report (.txt)",
+            type=["txt"],
+            key="dxdiag_report_upload",
+        )
+
+        if uploaded_dxdiag is not None:
+            raw_dxdiag = uploaded_dxdiag.getvalue().decode("utf-8", errors="replace")
+            parsed_dxdiag = parse_dxdiag_text(raw_dxdiag)
+            import_rows = build_import_rows(parsed_dxdiag)
+
+            if not import_rows:
+                st.warning("No supported DxDiag fields were found. Make sure you uploaded the full DxDiag text report.")
+            else:
+                st.success(f"Found {len(import_rows)} supported fields.")
+                st.dataframe(
+                    [
+                        {
+                            "Field": row["Field"],
+                            "Value": row["Value"],
+                            "Destination": row["Destination"],
+                            "Recommended": row["Recommended"],
+                        }
+                        for row in import_rows
+                    ],
+                    width="stretch",
+                    hide_index=True,
+                )
+
+                with st.form("apply_dxdiag_import"):
+                    st.write("Choose what to import into your profile.")
+
+                    selected_import_keys = []
+                    for row in import_rows:
+                        selected = st.checkbox(
+                            f'{row["Field"]} ? {row["Destination"]}',
+                            value=bool(row["Recommended"]),
+                            key=f'dxdiag_import_{row["key"]}',
+                        )
+                        if selected:
+                            selected_import_keys.append(row["key"])
+
+                    apply_import = st.form_submit_button("Apply selected system info")
+
+                if apply_import:
+                    if not selected_import_keys:
+                        st.warning("No fields selected.")
+                    else:
+                        st.session_state.profile = apply_system_report_to_profile(
+                            profile,
+                            parsed_dxdiag,
+                            selected_import_keys,
+                        )
+                        st.success(f"Imported {len(selected_import_keys)} fields into profile.")
+                        st.toast("System report imported.")
+                        st.rerun()
+
+                with st.expander("Parsed safe fields", expanded=False):
+                    st.json(parsed_dxdiag)
+
+
+with tabs[1]:
+    st.subheader("Tracker.gg Player Lookup")
+
+    try:
+        from apex_tracker import fetch_tracker_profile
+    except Exception as exc:
+        fetch_tracker_profile = None
+        st.error(f"Tracker module unavailable: {exc}")
+
+    tracker_cols = st.columns([1, 2, 1])
+    with tracker_cols[0]:
+        tracker_platform = st.selectbox("Platform", ["origin", "xbl", "psn"], index=0)
+    with tracker_cols[1]:
+        tracker_player = st.text_input("Player handle", value=st.session_state.get("tracker_player", "ifalsetto"))
+    with tracker_cols[2]:
+        st.write("")
+        st.write("")
+        search_tracker = st.button("Search Tracker", width="stretch")
+
+    if search_tracker and fetch_tracker_profile:
+        st.session_state.tracker_player = tracker_player
+        with st.spinner("Fetching Tracker profile..."):
+            st.session_state.tracker_profile = fetch_tracker_profile(tracker_player, tracker_platform)
+
+    tracker_profile = st.session_state.get("tracker_profile")
+    if tracker_profile:
+        if tracker_profile.get("source") == "fallback":
+            st.warning(tracker_profile.get("error", "Tracker fallback data is active."))
+        else:
+            st.success("Tracker profile loaded.")
+
+        stat_cols = st.columns(6)
+        stat_cols[0].metric("Player", tracker_profile.get("player_name", "?"))
+        stat_cols[1].metric("Level", tracker_profile.get("level", "?"))
+        stat_cols[2].metric("Rank", tracker_profile.get("rank", "?"))
+        stat_cols[3].metric("Kills", tracker_profile.get("kills", "?"))
+        stat_cols[4].metric("Wins", tracker_profile.get("wins", "?"))
+        stat_cols[5].metric("K/D", tracker_profile.get("kd", "?"))
+
+        st.metric("Current Legend", tracker_profile.get("current_legend", "?"))
+
+        with st.expander("Raw Tracker payload", expanded=False):
+            st.json(tracker_profile.get("raw", {}))
+    else:
+        st.info("Search a player to load Tracker stats. If the API key is missing/invalid, fallback mode stays active.")
+
+with tabs[2]:
+    st.subheader("HDR / Display Guide")
+
+    toggles = profile.setdefault("toggles", {})
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        toggles["hdrWindowsOn"] = st.checkbox("Windows HDR", value=bool(toggles.get("hdrWindowsOn", True)))
+        toggles["autoHdrOn"] = st.checkbox("Auto HDR", value=bool(toggles.get("autoHdrOn", True)))
+    with col2:
+        toggles["rtxHdrOn"] = st.checkbox("RTX HDR", value=bool(toggles.get("rtxHdrOn", False)))
+        toggles["gsyncOn"] = st.checkbox("G-SYNC", value=bool(toggles.get("gsyncOn", True)))
+    with col3:
+        toggles["vsyncInGameOff"] = st.checkbox("In-game V-Sync OFF", value=bool(toggles.get("vsyncInGameOff", True)))
+        toggles["reflexBoostOn"] = st.checkbox("NVIDIA Reflex + Boost", value=bool(toggles.get("reflexBoostOn", True)))
+
+    hdr_setup = profile.get("hdrSetup", {})
+    for section, steps in hdr_setup.items():
+        with st.expander(str(section).title(), expanded=False):
+            if isinstance(steps, list):
+                for step in steps:
+                    st.write(f"- {step}")
+            else:
+                st.write(steps)
+
+with tabs[3]:
+    st.subheader("Presets")
+
+    presets = profile.get("presets", {})
+    if presets:
+        selected_preset = st.selectbox("Preset", list(presets.keys()))
+        st.json(presets.get(selected_preset, {}))
+    else:
+        st.info("No presets found.")
+
+with tabs[4]:
+    st.subheader("Auto Match Log")
+
+    st.subheader("Live Apex Monitor")
+    st.caption(
+        "Local mode only. This uses process-only detection. It starts monitoring when r5apex* runs and ends/logs when the Apex process closes."
+    )
+
+    monitor = st.session_state.monitor_state
+    monitor.setdefault("enabled", True)
+    monitor.setdefault("auto_match_detection", True)
+    monitor.setdefault("poll_seconds", 3)
+    monitor.setdefault("start_streak_needed", 3)
+    monitor.setdefault("end_streak_needed", 6)
+    monitor.setdefault("last_logged_match_endISO", "")
+    monitor.setdefault("last_status", "Auto-detect armed")
+
+    control_cols = st.columns(4)
+
+    with control_cols[0]:
+        if st.button("Arm Auto Monitor", width="stretch"):
+            monitor["enabled"] = True
+            monitor["auto_match_detection"] = True
+            monitor["last_status"] = "Auto-detect armed"
+            st.session_state.monitor_state = monitor
+            st.rerun()
+
+    with control_cols[1]:
+        if st.button("Stop Monitor", width="stretch"):
+            monitor["enabled"] = False
+            monitor["auto_match_detection"] = False
+            monitor["last_status"] = "Monitoring stopped"
+            st.session_state.monitor_state = monitor
+            st.rerun()
+
+    with control_cols[2]:
+        monitor["poll_seconds"] = st.number_input(
+            "Poll seconds",
+            min_value=1,
+            max_value=15,
+            value=safe_int(monitor.get("poll_seconds", 3), 3, 1, 15),
+            step=1,
+            key="live_monitor_poll_seconds",
+        )
+
+    with control_cols[3]:
+        monitor["auto_match_detection"] = st.checkbox(
+            "Auto-detect matches",
+            value=bool(monitor.get("auto_match_detection", True)),
+            help="When enabled, the app keeps watching for Apex and auto-starts/ends session monitoring.",
+            key="auto_detect_apex_matches",
+        )
+
+    if monitor.get("auto_match_detection"):
+        monitor["enabled"] = True
+        monitor["last_status"] = "Auto-detect armed"
+
+    if monitor.get("enabled"):
+        st_autorefresh(
+            interval=int(monitor.get("poll_seconds", 3)) * 1000,
+            key="apex_live_monitor_refresh",
+        )
+
+        try:
+            monitor = monitor_tick(monitor)
+            st.session_state.monitor_state = monitor
+        except Exception as exc:
+            monitor["last_status"] = f"Monitor error: {exc}"
+            st.session_state.monitor_state = monitor
+            st.warning(f"Live monitor error: {exc}")
+
+    apex_running = bool(monitor.get("apex_running"))
+    in_match = bool(monitor.get("in_match"))
+    linked = bool(monitor.get("enabled")) and apex_running
+
+    status_cols = st.columns(4)
+    status_cols[0].metric("Monitor", "On" if monitor.get("enabled") else "Off")
+    status_cols[1].metric("Apex Process", "Running" if apex_running else "Closed")
+    status_cols[2].metric("Linked", "Yes" if linked else "No")
+    status_cols[3].metric("Game Monitor", "Recording" if in_match else "Waiting")
+
+    sample_cols = st.columns(4)
+    sample_cols[0].metric("CPU Peak", f'{float(monitor.get("cpu_peak", 0.0)):.2f}%')
+    sample_cols[1].metric("Detection", "Process-only")
+    sample_cols[2].metric("Started", monitor.get("match_startISO", "") or "-")
+    sample_cols[3].metric("Last Tick", monitor.get("last_tickISO", ""))
+
+    with st.expander("Live monitor details", expanded=False):
+        st.write("Detection mode: `process-only`")
+        st.write("Process match: `r5apex*`")
+        st.write(f'Session start: `{monitor.get("match_startISO", "")}`')
+        st.write(f'Session end: `{monitor.get("match_endISO", "")}`')
+        st.write(f'Status: `{monitor.get("last_status", "Idle")}`')
+
+    with st.expander("OCR upgrade path", expanded=False):
+        st.write("OCR is not required for the first auto monitor. Add OCR later if we need stronger match-start/end confirmation.")
+        st.write("- Start signals: ROUND 1, CHAMPION SQUAD, DROPSHIP, SQUADS LEFT")
+        st.write("- End signals: SQUAD ELIMINATED, YOU ARE THE CHAMPION, MATCH SUMMARY, DEATH RECAP")
+        st.write("OCR should use screen capture only. No game memory reading, no input automation, no game file changes.")
+
+    ended_match = (
+        bool(monitor.get("match_endISO"))
+        and monitor.get("match_endISO") != monitor.get("last_logged_match_endISO")
+        and bool(monitor.get("match_startISO"))
+    )
+
+    if ended_match:
+        try:
+            start_dt = dt.datetime.fromisoformat(str(monitor.get("match_startISO")))
+            end_dt = dt.datetime.fromisoformat(str(monitor.get("match_endISO")))
+            duration_s = max(0, int((end_dt - start_dt).total_seconds()))
+        except Exception:
+            duration_s = 0
+
+        cpu_avg, cpu_peak = compute_cpu_stats(monitor.get("cpu_samples", []))
+        hdr_mode = hdr_method_label(profile.get("toggles", {}))
+        sig = settings_signature(profile)
+
+        auto_entry = {
+            "createdISO": now_iso(),
+            "match_startISO": monitor.get("match_startISO", ""),
+            "match_endISO": monitor.get("match_endISO", ""),
+            "duration_s": duration_s,
+            "mode": "Auto-detected",
+            "map": "",
+            "hdr_mode": hdr_mode,
+            "avg_fps": "",
+            "one_percent_low": "",
+            "ping_ms": "",
+            "packet_loss_pct": "",
+            "cpu_avg_pct": cpu_avg,
+            "cpu_peak_pct": cpu_peak,
+            "input_feel_1_10": "",
+            "settings_signature": sig,
+            "compare_to_similar": compare_vs_similar(
+                find_similar_entries(profile.get("performanceLogs", []), sig, hdr_mode),
+                {"cpu_avg_pct": cpu_avg},
+            ),
+            "notes": "Auto-created by Live Apex Monitor when Apex/session ended.",
+        }
+
+        profile.setdefault("performanceLogs", []).append(auto_entry)
+        monitor["last_logged_match_endISO"] = monitor.get("match_endISO")
+        monitor["last_status"] = "Auto log created"
+        st.session_state.monitor_state = monitor
+        st.session_state.profile = profile
+
+        st.success("Live monitor created an auto session log.")
+        st.toast("Apex session logged.")
+
+    st.divider()
+
+    with st.form("manual_match_log"):
+        match_cols = st.columns(4)
+        mode = match_cols[0].text_input("Mode", value="Ranked")
+        map_name = match_cols[1].text_input("Map", value="")
+        avg_fps = match_cols[2].number_input("Avg FPS", min_value=0, max_value=500, value=0)
+        ping_ms = match_cols[3].number_input("Ping ms", min_value=0, max_value=500, value=0)
+
+        notes = st.text_area("Match notes", height=90)
+        submitted = st.form_submit_button("Add Match Log")
+
+    if submitted:
+        profile.setdefault("performanceLogs", []).append({
+            "createdISO": now_iso(),
+            "mode": mode,
+            "map": map_name,
+            "avg_fps": avg_fps,
+            "ping_ms": ping_ms,
+            "notes": notes,
+            "settings_signature": profile_hash(profile),
+        })
+        st.success("Match log added.")
+        st.toast("Match log added.")
+
+with tabs[5]:
+    st.subheader("Match History / Performance Logs")
+
+    logs = profile.get("performanceLogs", [])
+    if logs:
+        st.dataframe(logs, width="stretch")
+        st.download_button(
+            "Download logs CSV",
+            data=logs_to_csv_bytes(logs),
+            file_name="apex_performance_logs.csv",
+            mime="text/csv",
+            width="stretch",
+        )
+    else:
+        st.info("No performance logs yet.")
+
+with tabs[6]:
+    st.subheader("Network")
+
+    st.info(
+        "Local one-click import works when this dashboard is running on your Windows PC. "
+        "The live Streamlit Cloud app cannot directly read your network adapter settings.",
+    )
+
+    try:
+        from apex_local_importer import (
+            apply_network_settings_to_profile,
+            collect_local_network_settings,
+        )
+    except Exception as exc:
+        st.warning(f"Local network importer unavailable: {exc}")
+    else:
+        redact_network_ids = st.checkbox(
+            "Redact local IPv4/MAC values",
+            value=True,
+            key="redact_local_network_ids",
+        )
+
+        if st.button("Import Local Network Settings", width="stretch"):
+            result = collect_local_network_settings(redact_local_ids=redact_network_ids)
+
+            if not result.get("ok"):
+                st.warning(result.get("error", "Local network import failed."))
+            else:
+                imported_network = result.get("data", {})
+                st.session_state.last_local_network_import = imported_network
+                st.session_state.profile = apply_network_settings_to_profile(profile, imported_network)
+                st.success("Local network settings imported.")
+                st.toast("Network imported.")
+                st.rerun()
+
+        if st.session_state.get("last_local_network_import"):
+            with st.expander("Last imported network data", expanded=False):
+                st.json(st.session_state.last_local_network_import)
+
+
+    network = profile.setdefault("network", {})
+
+    imported_network_details = network.get("importedSettings") or st.session_state.get("last_local_network_import")
+    if imported_network_details:
+        st.subheader("Imported Network Details")
+
+        detail_cols = st.columns(4)
+        detail_cols[0].metric(
+            "Adapter",
+            str(network.get("adapter_name") or imported_network_details.get("InterfaceAlias") or "Unknown"),
+        )
+        detail_cols[1].metric(
+            "Status",
+            str(network.get("adapter_status") or imported_network_details.get("Status") or "Unknown"),
+        )
+        detail_cols[2].metric(
+            "Link Speed",
+            str(network.get("link_speed") or imported_network_details.get("LinkSpeed") or "Unknown"),
+        )
+        detail_cols[3].metric(
+            "Gateway Ping",
+            str(network.get("tests", {}).get("gateway_ping_ms") or imported_network_details.get("GatewayPingMs") or "N/A"),
+        )
+
+        imported_rows = [
+            {
+                "Field": "Connection",
+                "Value": network.get("connection", ""),
+            },
+            {
+                "Field": "Adapter Name",
+                "Value": network.get("adapter_name") or imported_network_details.get("InterfaceAlias", ""),
+            },
+            {
+                "Field": "Adapter Description",
+                "Value": network.get("adapter_description") or imported_network_details.get("InterfaceDescription", ""),
+            },
+            {
+                "Field": "Adapter Status",
+                "Value": network.get("adapter_status") or imported_network_details.get("Status", ""),
+            },
+            {
+                "Field": "Link Speed",
+                "Value": network.get("link_speed") or imported_network_details.get("LinkSpeed", ""),
+            },
+            {
+                "Field": "IPv4 Address",
+                "Value": network.get("ipv4_address") or imported_network_details.get("IPv4Address", ""),
+            },
+            {
+                "Field": "Default Gateway",
+                "Value": network.get("default_gateway") or imported_network_details.get("DefaultGateway", ""),
+            },
+            {
+                "Field": "DNS Servers",
+                "Value": network.get("dns") or imported_network_details.get("DnsServers", ""),
+            },
+            {
+                "Field": "MAC Address",
+                "Value": network.get("mac_address") or imported_network_details.get("MacAddress", ""),
+            },
+            {
+                "Field": "Imported At",
+                "Value": network.get("networkImportedAt") or imported_network_details.get("ImportedAt", ""),
+            },
+        ]
+
+        st.dataframe(imported_rows, width="stretch", hide_index=True)
+
+    left, right = st.columns(2)
+
+    with left:
+        network["connection"] = st.text_input("Connection", value=str(network.get("connection", "Ethernet")))
+        network["isp"] = st.text_input("ISP", value=str(network.get("isp", "")))
+        network["router_model"] = st.text_input("Router model", value=str(network.get("router_model", "")))
+        network["modem_model"] = st.text_input("Modem / fiber box", value=str(network.get("modem_model", "")))
+        network["adapter_name"] = st.text_input("Adapter name", value=str(network.get("adapter_name", "")))
+        network["adapter_description"] = st.text_input("Adapter description", value=str(network.get("adapter_description", "")))
+        network["default_gateway"] = st.text_input("Default gateway", value=str(network.get("default_gateway", "")))
+        network["dns"] = st.text_input("DNS servers", value=str(network.get("dns", "")))
+
+    with right:
+        tests = network.setdefault("tests", {})
+        network["adapter_status"] = st.text_input("Adapter status", value=str(network.get("adapter_status", "")))
+        network["link_speed"] = st.text_input("Link speed", value=str(network.get("link_speed", "")))
+        network["ipv4_address"] = st.text_input("IPv4 address", value=str(network.get("ipv4_address", "")))
+        network["mac_address"] = st.text_input("MAC address", value=str(network.get("mac_address", "")))
+        tests["gateway_ping_ms"] = st.text_input("Gateway ping ms", value=str(tests.get("gateway_ping_ms", "")))
+        tests["speedtest_down_mbps"] = st.text_input("Download Mbps", value=str(tests.get("speedtest_down_mbps", "")))
+        tests["speedtest_up_mbps"] = st.text_input("Upload Mbps", value=str(tests.get("speedtest_up_mbps", "")))
+        tests["speedtest_ping_ms"] = st.text_input("Internet ping ms", value=str(tests.get("speedtest_ping_ms", "")))
+        tests["packet_loss_pct"] = st.text_input("Packet loss %", value=str(tests.get("packet_loss_pct", "")))
+
+    network["notes"] = st.text_area("Network notes", value=str(network.get("notes", "")), height=100)
+
+with tabs[7]:
+    st.subheader("Storage Audit")
+
+    storage_targets = [
+        ("Snapshots", SNAP_DIR),
+        ("Scans", SCAN_DIR),
+        ("Exports", EXPORT_DIR),
+        ("Profiles", PROFILES_DIR),
+        ("TempBin", TEMPBIN_DIR),
+        ("Trash", TRASHBIN_DIR),
+        ("StorageMap", STORAGE_DIR),
+    ]
+
+    rows = []
+    for label, folder in storage_targets:
+        path_obj = Path(folder)
+        total_bytes = 0
+        file_count = 0
+
+        if path_obj.exists():
+            for item in path_obj.rglob("*"):
+                try:
+                    if item.is_file():
+                        file_count += 1
+                        total_bytes += item.stat().st_size
+                except Exception:
+                    pass
+
+        rows.append({
+            "Label": label,
+            "Path": str(path_obj),
+            "Exists": path_obj.exists(),
+            "Files": file_count,
+            "Size": bytes_human(total_bytes),
+        })
+
+    st.dataframe(rows, width="stretch")
+
+with tabs[8]:
+    st.subheader("Help Library")
+
+    library_type = st.radio("Library", ["Settings", "Launch Options"], horizontal=True)
+
+    if library_type == "Settings":
+        keys = list(SETTING_LIBRARY.keys())
+        if keys:
+            selected = st.selectbox("Setting", keys)
+            st.json(SETTING_LIBRARY[selected])
+        else:
+            st.info("No setting library entries yet.")
+    else:
+        keys = list(LAUNCH_OPTION_LIBRARY.keys())
+        if keys:
+            selected = st.selectbox("Launch option", keys)
+            st.json(LAUNCH_OPTION_LIBRARY[selected])
+        else:
+            st.info("No launch option library entries yet.")
+
+st.divider()
+
+action_cols = st.columns(4)
+
+with action_cols[0]:
+    if st.button(UI["buttons"]["snapshot"], width="stretch"):
+        ok, path = save_unique_json(SNAP_DIR, profile, "manual_snapshot", "snapshot")
+        if ok:
+            st.success(f"Snapshot saved: {path}")
+            st.toast("Snapshot saved.")
+        else:
+            st.info(f"Duplicate snapshot skipped: {path}")
+
+with action_cols[1]:
+    st.download_button(
+        UI["buttons"]["export"],
+        data=json.dumps(profile, indent=2, ensure_ascii=False).encode("utf-8"),
+        file_name=f"{slug(profile['meta'].get('profileName', 'apex_profile'))}.json",
+        mime="application/json",
+        width="stretch",
+    )
+
+with action_cols[2]:
+    if st.button(UI["buttons"]["reset"], width="stretch"):
+        st.session_state.profile = deep_copy(DEFAULT_PROFILE)
+        st.warning("Profile reset to defaults.")
+        st.rerun()
+
+with action_cols[3]:
+    if st.button("Save Now", width="stretch"):
+        safe_save_json(AUTOSAVE_PATH, profile)
+        st.success("Profile autosaved.")
+        st.toast("Profile autosaved.")
+
 
 # ============== Autosave ==============
 profile = bump_updated(profile)

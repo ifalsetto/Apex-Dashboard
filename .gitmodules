@@ -1,0 +1,3 @@
+[submodule "Apex-Dashboard"]
+    path = Apex-Dashboard
+    url = https://github.com/ifalsetto/Apex-Dashboard.git

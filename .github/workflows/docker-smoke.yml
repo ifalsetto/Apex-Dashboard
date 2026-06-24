@@ -1,0 +1,68 @@
+name: Docker Smoke Test
+
+on:
+  pull_request:
+    paths:
+      - Dockerfile
+      - docker-compose.yml
+      - .dockerignore
+      - requirements.txt
+      - apex_config.py
+      - apex_dashboard.py
+      - false_apex_ai.py
+      - pages/**
+      - .github/workflows/docker-smoke.yml
+  push:
+    branches:
+      - main
+    paths:
+      - Dockerfile
+      - docker-compose.yml
+      - .dockerignore
+      - requirements.txt
+      - apex_config.py
+      - apex_dashboard.py
+      - false_apex_ai.py
+      - pages/**
+      - .github/workflows/docker-smoke.yml
+
+permissions:
+  contents: read
+
+jobs:
+  docker-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Validate Compose config
+        run: docker compose config
+
+      - name: Build Docker image
+        run: docker build -t apex-dashboard:ci .
+
+      - name: Start container
+        run: |
+          docker run -d \
+            --name apex-dashboard \
+            -p 8501:8501 \
+            -e APEX_DASHBOARD_DATA_DIR=/data \
+            apex-dashboard:ci
+
+      - name: Wait for Streamlit health endpoint
+        run: |
+          for i in {1..30}; do
+            if curl -fsS http://127.0.0.1:8501/_stcore/health; then
+              echo "Apex Dashboard container is healthy."
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "Apex Dashboard did not become healthy in time."
+          docker logs apex-dashboard
+          exit 1
+
+      - name: Stop container
+        if: always()
+        run: docker rm -f apex-dashboard || true

@@ -1,0 +1,9 @@
+Container template manifest:
+- Dockerfiles
+- Compose starters
+- healthcheck examples
+- env template
+- dockerignore template
+- README template
+- smoke-test workflow
+- runbooks

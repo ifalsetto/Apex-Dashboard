@@ -1,0 +1,19 @@
+﻿[2026-06-18 17:06:14] [INFO] Starting Apex gaming prep. Admin=False DryRun=False
+[2026-06-18 17:06:14] [INFO] Closed process chrome PID 4264
+[2026-06-18 17:06:14] [INFO] Closed process chrome PID 5748
+[2026-06-18 17:06:14] [INFO] Closed process chrome PID 7324
+[2026-06-18 17:06:14] [INFO] Closed process chrome PID 8976
+[2026-06-18 17:06:14] [INFO] Closed process chrome PID 9592
+[2026-06-18 17:06:14] [INFO] Closed process chrome PID 10304
+[2026-06-18 17:06:14] [INFO] Closed process chrome PID 13788
+[2026-06-18 17:06:14] [INFO] Closed process chrome PID 13820
+[2026-06-18 17:06:14] [WARN] Could not close process chrome PID 14656: Cannot find a process with the process identifier 14656.
+[2026-06-18 17:06:15] [WARN] Could not close process chrome PID 20004: Cannot find a process with the process identifier 20004.
+[2026-06-18 17:06:15] [WARN] Could not close process chrome PID 20580: Cannot find a process with the process identifier 20580.
+[2026-06-18 17:06:15] [WARN] Could not close process chrome PID 21660: Cannot find a process with the process identifier 21660.
+[2026-06-18 17:06:15] [WARN] Could not close process chrome PID 22584: Cannot find a process with the process identifier 22584.
+[2026-06-18 17:06:16] [WARN] Could not close process chrome PID 23212: Cannot find a process with the process identifier 23212.
+[2026-06-18 17:06:16] [WARN] Could not close process chrome PID 23528: Cannot find a process with the process identifier 23528.
+[2026-06-18 17:06:16] [INFO] Closed process PhoneExperienceHost PID 20236
+[2026-06-18 17:06:16] [INFO] Closed process CrossDeviceService PID 17552
+[2026-06-18 17:06:16] [INFO] State saved: C:\Users\andre\AppData\Local\Temp\FalseTechApexGamingPrepState.json

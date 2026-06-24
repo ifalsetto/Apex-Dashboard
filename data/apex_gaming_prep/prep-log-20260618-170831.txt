@@ -1,0 +1,19 @@
+﻿[2026-06-18 17:08:31] [INFO] Starting Apex gaming prep. Admin=True DryRun=False
+[2026-06-18 17:08:31] [INFO] Closed process chrome PID 420
+[2026-06-18 17:08:31] [INFO] Closed process chrome PID 2072
+[2026-06-18 17:08:31] [INFO] Closed process chrome PID 3592
+[2026-06-18 17:08:31] [INFO] Closed process chrome PID 10428
+[2026-06-18 17:08:31] [INFO] Closed process chrome PID 11980
+[2026-06-18 17:08:31] [INFO] Closed process chrome PID 12112
+[2026-06-18 17:08:31] [INFO] Closed process chrome PID 17692
+[2026-06-18 17:08:31] [INFO] Closed process chrome PID 18188
+[2026-06-18 17:08:31] [INFO] Closed process chrome PID 18480
+[2026-06-18 17:08:31] [INFO] Closed process chrome PID 18792
+[2026-06-18 17:08:31] [INFO] Closed process chrome PID 21080
+[2026-06-18 17:08:31] [WARN] Could not close process chrome PID 21216: Cannot find a process with the process identifier 21216.
+[2026-06-18 17:08:31] [WARN] Could not close process chrome PID 22444: Cannot find a process with the process identifier 22444.
+[2026-06-18 17:08:31] [WARN] Could not close process chrome PID 23416: Cannot find a process with the process identifier 23416.
+[2026-06-18 17:08:31] [WARN] Could not close process chrome PID 24404: Cannot find a process with the process identifier 24404.
+[2026-06-18 17:08:32] [INFO] Service not running, no action: BITS
+[2026-06-18 17:08:32] [INFO] Service not running, no action: wuauserv
+[2026-06-18 17:08:32] [INFO] State saved: C:\Users\andre\AppData\Local\Temp\FalseTechApexGamingPrepState.json

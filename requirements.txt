@@ -1,56 +1,10 @@
-python>=3.9
-
-# Web UI & Visualization
-streamlit==1.44.1  # Web app framework
-altair==6.0.0  # Declarative visualization
-pydeck==0.9.1  # Large-scale maps
-
-# Data & Analysis
-numpy==2.2.0  # Numerical computing
-pandas==2.2.0  # Data manipulation
-pyarrow==23.0.0  # Arrow data format support
-narwhals==2.16.0  # Dataframe abstraction layer
-
-# API & HTTP
-requests==2.32.5  # HTTP client
-openai==1.66.0  # OpenAI API client
-
-# Date & Time
-python-dateutil==2.9.0.post0  # Date utilities
-pytz==2025.2  # Timezone database
-tzdata==2025.3  # IANA timezone data
-
-# Image Processing
-pillow==11.2.0  # Image library
-
-# Git Integration
-GitPython==3.1.46  # Git operations
-gitdb==4.0.12  # Git object database
-
-# Configuration & Serialization
-protobuf==6.33.5  # Protocol buffers
-toml==0.10.2  # TOML parser
-Jinja2==3.1.6  # Template engine
-MarkupSafe==3.0.3  # Safe string handling
-
-# Utilities
-attrs==25.4.0  # Class decorator utilities
-blinker==1.9.0  # Signal library
-cachetools==6.2.6  # Caching utilities
-certifi==2026.1.4  # CA bundle
-charset-normalizer==3.4.4  # Character set detection
-click==8.3.1  # CLI framework
-colorama==0.4.6  # Cross-platform colored output
-idna==3.11  # IDNA codec
-jsonschema==4.26.0  # JSON schema validation
-jsonschema-specifications==2025.9.1  # JSON schema specs
-packaging==26.0  # Package version handling
-referencing==0.37.0  # JSON reference resolution
-rpds-py==0.30.0  # Rust-backed data structures
-six==1.17.0  # Python 2/3 compatibility
-smmap==5.0.2  # Sliding window memory map
-tenacity==9.1.2  # Retry library
-tornado==6.5.4  # Async web framework
-typing_extensions==4.15.0  # Type hints backports
-urllib3==2.6.3  # HTTP client library
-watchdog==6.0.0  # File system event monitoring
+streamlit
+streamlit-autorefresh
+pandas
+numpy
+altair
+pydeck
+requests
+openai
+pillow
+psutil

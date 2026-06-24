@@ -1,0 +1,4 @@
+﻿[2026-06-18 17:09:48] [INFO] Starting Apex gaming prep. Admin=True DryRun=False
+[2026-06-18 17:09:48] [INFO] Service not running, no action: BITS
+[2026-06-18 17:09:48] [INFO] Service not running, no action: wuauserv
+[2026-06-18 17:09:49] [INFO] State saved: C:\Users\andre\AppData\Local\Temp\FalseTechApexGamingPrepState.json
