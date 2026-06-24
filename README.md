@@ -92,6 +92,10 @@ Streamlit Apex Dashboard for legitimate Apex Legends settings management, perfor
 
 ## Status
 
+Streamlit Apex Dashboard for legitimate Apex Legends settings management, performance review, public stats lookup, match logging, and AI-assisted coaching.
+
+## Status
+
 Beta release for testing and bug reports.
 
 ## Run with Docker Compose
