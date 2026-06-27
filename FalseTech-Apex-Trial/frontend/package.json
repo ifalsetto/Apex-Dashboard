@@ -4,10 +4,12 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "dev": "vite --port 5173 --strictPort",
+    "dev": "vite --host localhost --port 5173 --strictPort",
+    "dev:local": "vite --host localhost --port 5173 --strictPort",
     "build": "vite build",
     "typecheck": "tsc --noEmit",
-    "preview": "vite preview"
+    "check": "npm run typecheck && npm run build",
+    "preview": "vite preview --host localhost --port 4173 --strictPort"
   },
   "dependencies": {
     "@auth0/auth0-react": "^2.19.0",
