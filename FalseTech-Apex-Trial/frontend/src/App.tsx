@@ -1,3 +1,4 @@
+﻿import AuthPanel from "./AuthPanel";
 import { useEffect, useMemo, useReducer, useState } from 'react';
 
 type PlatformUi = 'steam' | 'xbl' | 'psn';
@@ -580,7 +581,7 @@ function Section({
           <div className="section-title">{title}</div>
           <div className="section-description">{description}</div>
         </div>
-        <div className={`section-chevron ${isOpen ? 'open' : ''}`}>⌄</div>
+        <div className={`section-chevron ${isOpen ? 'open' : ''}`}>âŒ„</div>
       </button>
       {isOpen ? <div className="section-body">{children}</div> : null}
     </section>
@@ -821,6 +822,7 @@ export default function App() {
     <div className="app-shell">
       <AmbientStage />
       <div className="overlay-glow" />
+        <AuthPanel /> 
       <header className="header">
         <div className="header-top">
           <div>
@@ -829,14 +831,14 @@ export default function App() {
               <div>
                 <h1>FalseTech Apex Elite Dashboard</h1>
                 <p>
-                  {state.profile.username} • live stats • default layout first • music • squads • creator unlocks
+                  {state.profile.username} â€¢ live stats â€¢ default layout first â€¢ music â€¢ squads â€¢ creator unlocks
                 </p>
               </div>
             </div>
           </div>
           <div className="header-actions">
             <button className="button button--gold" onClick={() => void refreshLive()} disabled={state.syncing}>
-              {state.syncing ? 'Refreshing…' : 'Refresh Live'}
+              {state.syncing ? 'Refreshingâ€¦' : 'Refresh Live'}
             </button>
             <button className="button" onClick={() => setAllSections(true)}>Expand All</button>
             <button className="button" onClick={() => setAllSections(false)}>Collapse All</button>
@@ -872,8 +874,8 @@ export default function App() {
         </div>
 
         <div className="stats-grid">
-          <StatBadge title="Current Rank" value={`${state.profile.currentRank} • ${formatNumber(state.profile.currentRp)} RP`} />
-          <StatBadge title="Peak Rank" value={`${state.profile.peakRank} • ${formatNumber(state.profile.peakRp)} RP`} />
+          <StatBadge title="Current Rank" value={`${state.profile.currentRank} â€¢ ${formatNumber(state.profile.currentRp)} RP`} />
+          <StatBadge title="Peak Rank" value={`${state.profile.peakRank} â€¢ ${formatNumber(state.profile.peakRp)} RP`} />
           <StatBadge title="Main Legend" value={state.profile.mainLegend} />
           <StatBadge title="Best Loadout" value={state.profile.bestLoadout} />
           <StatBadge title="Win Rate" value={`${winRate}%`} />
@@ -908,7 +910,7 @@ export default function App() {
             </Card>
 
             <div className="stack-column">
-              <Card><strong>Active profile</strong><p>{state.activeHandle} • {platformLabel(state.platformUi)}</p></Card>
+              <Card><strong>Active profile</strong><p>{state.activeHandle} â€¢ {platformLabel(state.platformUi)}</p></Card>
               <Card><strong>Default layout</strong><p>FalseTech Default Layout</p></Card>
               <Card><strong>Last live sync</strong><p>{state.lastSync ? new Date(state.lastSync).toLocaleString() : 'Waiting for first refresh'}</p></Card>
               {state.syncError ? <Card><strong>Live status</strong><p>{state.syncError}</p></Card> : null}
@@ -1012,7 +1014,7 @@ export default function App() {
                   {friends.map((friend) => (
                     <div key={friend} className="friend-chip">
                       <button onClick={() => handleOpenProfile(friend)}>{friend}</button>
-                      <button onClick={() => handleRemoveFriend(friend)} aria-label={`Remove ${friend}`}>×</button>
+                      <button onClick={() => handleRemoveFriend(friend)} aria-label={`Remove ${friend}`}>Ã—</button>
                     </div>
                   ))}
                 </div>
@@ -1021,7 +1023,7 @@ export default function App() {
             <Card>
               <h3>Friend flow</h3>
               <div className="stack-column">
-                <Info title="Step 1" text="Type a friend’s Apex username once and add it to the list." />
+                <Info title="Step 1" text="Type a friendâ€™s Apex username once and add it to the list." />
                 <Info title="Step 2" text="Click the username whenever you want to switch the board to that live profile." />
                 <Info title="Step 3" text="The dashboard refreshes that live profile automatically, just like your own." />
                 <Info title="Result" text="The app feels socially useful without becoming a generic social-media clone." />
@@ -1115,7 +1117,7 @@ export default function App() {
               ))}
             </div>
             <Card>
-              <h3>{selectedLegendRecord.name} • {selectedLegendRecord.fit}/100 fit</h3>
+              <h3>{selectedLegendRecord.name} â€¢ {selectedLegendRecord.fit}/100 fit</h3>
               <div className="stack-column">
                 <Info title="Passive" text={selectedLegendRecord.passive} />
                 <Info title="Tactical" text={selectedLegendRecord.tactical} />
@@ -1137,7 +1139,7 @@ export default function App() {
                     onClick={() => setSelectedWeapon(weapon.id)}
                   >
                     <strong>{weapon.name}</strong>
-                    <span>{weapon.class} • {weapon.ammo}</span>
+                    <span>{weapon.class} â€¢ {weapon.ammo}</span>
                     <p>{weapon.note}</p>
                   </button>
                 ))}
@@ -1148,7 +1150,7 @@ export default function App() {
               </Card>
             </div>
             <Card>
-              <h3>{selectedWeaponRecord.name} • {selectedWeaponRecord.tier} tier</h3>
+              <h3>{selectedWeaponRecord.name} â€¢ {selectedWeaponRecord.tier} tier</h3>
               <div className="metric-grid">
                 <MetricTile label="Range" value={selectedWeaponRecord.range} />
                 <MetricTile label="Fit" value={`${selectedWeaponRecord.fit}/100`} />
@@ -1179,7 +1181,7 @@ export default function App() {
                       {session.delta >= 0 ? '+' : ''}{session.delta} RP
                     </span>
                   </div>
-                  <div className="session-card__meta">{session.time} • {session.map} • {session.placement}</div>
+                  <div className="session-card__meta">{session.time} â€¢ {session.map} â€¢ {session.placement}</div>
                   <p>{session.summary}</p>
                 </button>
               ))}
@@ -1189,7 +1191,7 @@ export default function App() {
               </Card>
             </div>
             <Card>
-              <h3>{selectedSessionRecord.legend} • {selectedSessionRecord.time}</h3>
+              <h3>{selectedSessionRecord.legend} â€¢ {selectedSessionRecord.time}</h3>
               <div className="metric-grid">
                 <MetricTile label="Placement" value={selectedSessionRecord.placement} />
                 <MetricTile label="Kills" value={selectedSessionRecord.kills} />
@@ -1296,3 +1298,4 @@ function Range({ label, value, min, max, step = 1, onChange }: { label: string; 
     </label>
   );
 }
+
