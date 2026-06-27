@@ -1,88 +1,64 @@
+# Python
 .venv/
 __pycache__/
 *.pyc
 *.pyo
-*.bak
-*.log
-bulk_indent_repair.py
-smoke_test.py
+.pytest_cache/
+.mypy_cache/
+
+# Local secrets and machine-specific config
 .env
-.DS_Store
-apex_dashboard_source.zip
-profile_autosave.json
-.streamlit/secrets.toml
-requirements.clean.txt
-requirements.before-security-clean.txt
-local-freeze.txt
-pip-freeze.txt
-.streamlit/secrets.toml.*
+.env.*
 *.env
+!.env.example
+.streamlit/secrets.toml
+.streamlit/secrets.toml.*
+secrets.*
 *.key
 *.pem
-*.zip
 
-# Local secrets / machine-specific config
-.streamlit/secrets.toml
-.env
-.env.*
-!.env.example
-
-# Local network/system exports
-data/network/*.json
-data/network/*.jsonl
-data/network/*.log
-!data/network/.gitkeep
-
-# Local diagnostics
-*.log
-*dxdiag*.txt
-*DxDiag*.txt
-diagnostics/
-reports/local/
-
-# Local backups / personal machine patches
-*.old.py
-*.personal-backup.py
-local_backups/
-
-# Local secrets / machine-specific config
-.streamlit/secrets.toml
-.env
-.env.*
-!.env.example
-
-# Local network/system exports
-data/network/*.json
-data/network/*.jsonl
-data/network/*.log
-!data/network/.gitkeep
-
-# Local diagnostics
-*.log
-*dxdiag*.txt
-*DxDiag*.txt
-diagnostics/
-reports/local/
-
-# Local environment files
-.env
-.env.local
-.env.*.local
-!.env.example
-# JavaScript and container build output
+# JavaScript / frontend build output
 **/node_modules/
 **/dist/
 **/build/
 **/coverage/
 **/.vite/
+**/.vite-temp/
 **/.wrangler/
 **/.cloudflare/
 **/.next/
 **/.turbo/
-**/.pytest_cache/
-**/.mypy_cache/
 
-# Additional secret-bearing file patterns
-*.key
-*.pem
-secrets.*
+# Local diagnostics and generated reports
+*.log
+*dxdiag*.txt
+*DxDiag*.txt
+diagnostics/
+reports/local/
+profile_autosave.json
+
+# Local network/system exports
+data/network/*.json
+data/network/*.jsonl
+data/network/*.log
+!data/network/.gitkeep
+
+# Local backups and one-off repair artifacts
+local_backups/
+LocalBackups/
+**/LocalRepairBackup_*/
+*.bak
+*.old.py
+*.personal-backup.py
+*.before-*
+*.before-*.*
+apex_dashboard_source.zip
+*.zip
+
+# Temporary one-off scripts from repair sessions
+bulk_indent_repair.py
+smoke_test.py
+requirements.clean.txt
+requirements.before-security-clean.txt
+local-freeze.txt
+pip-freeze.txt
