@@ -69,3 +69,20 @@ reports/local/
 .env.local
 .env.*.local
 !.env.example
+# JavaScript and container build output
+**/node_modules/
+**/dist/
+**/build/
+**/coverage/
+**/.vite/
+**/.wrangler/
+**/.cloudflare/
+**/.next/
+**/.turbo/
+**/.pytest_cache/
+**/.mypy_cache/
+
+# Additional secret-bearing file patterns
+*.key
+*.pem
+secrets.*

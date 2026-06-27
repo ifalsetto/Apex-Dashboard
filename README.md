@@ -1,4 +1,96 @@
-# Apex Dashboard (BETA)
+# FalseTech Apex Dashboard
+
+This mixed repository contains:
+
+- `FalseTech-Apex-Trial/frontend`: the current Vite + React command center
+- `FalseTech-Apex-Trial/backend`: the secure Tracker.gg Worker proxy
+- `apex_dashboard.py`: the legacy Streamlit dashboard
+
+The Docker setup runs the React command center and its backend proxy. The Tracker key is injected into the backend container at runtime and is never included in frontend code or the frontend image.
+
+## Docker
+
+Requirements:
+
+- Docker Desktop with the Linux engine running
+- Ports `5173` and `8787` available
+
+If a default port is already occupied, override it without changing container networking:
+
+```powershell
+$env:APEX_FRONTEND_PORT = "15173"
+$env:APEX_BACKEND_PORT = "18787"
+docker compose up -d
+```
+
+Create a local environment file only if Tracker integration is needed:
+
+```powershell
+Copy-Item .env.example .env
+```
+
+Leave `TRN_API_KEY` blank to run the dashboard with its existing preview/fallback data. If configured, the key remains server-side.
+
+Build the images:
+
+```powershell
+docker compose build
+```
+
+Run with Compose:
+
+```powershell
+docker compose up -d
+```
+
+Open:
+
+- Dashboard: `http://localhost:5173`
+- Backend health: `http://127.0.0.1:8787/health`
+
+Run the frontend image directly:
+
+```powershell
+docker build -t falsetech/apex-dashboard:local .
+docker run --rm -p 5173:5173 falsetech/apex-dashboard:local
+```
+
+The direct frontend-only command does not start the backend. Use Compose for working `/api/apex/...` proxy routes.
+
+View logs:
+
+```powershell
+docker compose logs --tail=100
+docker compose logs -f
+```
+
+Rebuild after dependency or source changes:
+
+```powershell
+docker compose build --no-cache
+docker compose up -d
+```
+
+Stop the stack without deleting images or source files:
+
+```powershell
+docker compose down
+```
+
+Do not add `-v` unless persistent volumes are intentionally disposable.
+
+The backend keeps these server-side routes ready:
+
+- `GET /api/apex/search`
+- `GET /api/apex/profile/:platform/:player`
+- `GET /api/apex/profile/:platform/:player/sessions`
+- `GET /api/apex/profile/:platform/:player/segments/:segmentType`
+
+## Legacy Streamlit Dashboard
+
+Streamlit Apex Dashboard for legitimate Apex Legends settings management, performance review, public stats lookup, match logging, and AI-assisted coaching.
+
+## Status
 
 Streamlit Apex Dashboard for legitimate Apex Legends settings management, performance review, public stats lookup, match logging, and AI-assisted coaching.
 
