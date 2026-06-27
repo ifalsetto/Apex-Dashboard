@@ -306,27 +306,27 @@ const DEFAULT_SESSIONS: SessionRecord[] = [
 const DEFAULT_UPDATES: UpdateRecord[] = [
   {
     id: 'u1',
-    title: 'Default layout starts every user the same way',
+    title: 'Apex v2 command center',
     category: 'Creator',
     priority: 'High',
-    summary: 'Every fresh user begins on your branded default layout before custom layouts unlock.',
-    action: 'Keep your default board polished because this is the first impression.'
+    summary: 'Every user lands on a focused Apex command center with live stats, sessions, legends, weapons, and squads.',
+    action: 'Keep the first screen tuned for real player decisions instead of template content.'
   },
   {
     id: 'u2',
-    title: 'Music lane builds creator identity instantly',
+    title: 'Music lane supports creator identity',
     category: 'Music',
     priority: 'High',
-    summary: 'Your music on the dashboard by default makes the product feel like your world, not a generic tracker.',
-    action: 'Hide from the player card, restore from settings.'
+    summary: 'The music lane gives the beta a distinct creator surface while staying optional and user-controlled.',
+    action: 'Hide from the music card, restore from Settings.'
   },
   {
     id: 'u3',
-    title: 'Friends and squads stay live-first',
+    title: 'Friends and squads stay profile-first',
     category: 'Social',
     priority: 'Critical',
-    summary: 'The board should feel like the home base for an Apex player, not just a static stats page.',
-    action: 'Keep live profile switching and squad surfaces near the top.'
+    summary: 'Profile switching, squad planning, and session review stay close together for repeated Apex use.',
+    action: 'Keep Friends, Squads, and Session Review easy to scan.'
   }
 ];
 
@@ -581,7 +581,7 @@ function Section({
           <div className="section-title">{title}</div>
           <div className="section-description">{description}</div>
         </div>
-        <div className={`section-chevron ${isOpen ? 'open' : ''}`}>âŒ„</div>
+        <div className={`section-chevron ${isOpen ? 'open' : ''}`}>v</div>
       </button>
       {isOpen ? <div className="section-body">{children}</div> : null}
     </section>
@@ -829,16 +829,16 @@ export default function App() {
             <div className="brand-row">
               <div className="brand-mark">FT</div>
               <div>
-                <h1>FalseTech Apex Elite Dashboard</h1>
+                <h1>FalseTech Apex Dashboard v2 Beta</h1>
                 <p>
-                  {state.profile.username} â€¢ live stats â€¢ default layout first â€¢ music â€¢ squads â€¢ creator unlocks
+                  {state.profile.username} | live stats | sessions | legends | weapons | squads
                 </p>
               </div>
             </div>
           </div>
           <div className="header-actions">
             <button className="button button--gold" onClick={() => void refreshLive()} disabled={state.syncing}>
-              {state.syncing ? 'Refreshingâ€¦' : 'Refresh Live'}
+              {state.syncing ? 'Refreshing...' : 'Refresh Live'}
             </button>
             <button className="button" onClick={() => setAllSections(true)}>Expand All</button>
             <button className="button" onClick={() => setAllSections(false)}>Collapse All</button>
@@ -867,15 +867,15 @@ export default function App() {
           </div>
           <div className="pill-row">
             <Pill tone="gold">Royal purple + gold</Pill>
-            <Pill>Default layout first</Pill>
-            <Pill>Music on by default</Pill>
-            <Pill>Live friends</Pill>
+            <Pill>Live Data</Pill>
+            <Pill>Friends</Pill>
+            <Pill>Match Notes</Pill>
           </div>
         </div>
 
         <div className="stats-grid">
-          <StatBadge title="Current Rank" value={`${state.profile.currentRank} â€¢ ${formatNumber(state.profile.currentRp)} RP`} />
-          <StatBadge title="Peak Rank" value={`${state.profile.peakRank} â€¢ ${formatNumber(state.profile.peakRp)} RP`} />
+          <StatBadge title="Current Rank" value={`${state.profile.currentRank} | ${formatNumber(state.profile.currentRp)} RP`} />
+          <StatBadge title="Peak Rank" value={`${state.profile.peakRank} | ${formatNumber(state.profile.peakRp)} RP`} />
           <StatBadge title="Main Legend" value={state.profile.mainLegend} />
           <StatBadge title="Best Loadout" value={state.profile.bestLoadout} />
           <StatBadge title="Win Rate" value={`${winRate}%`} />
@@ -883,26 +883,26 @@ export default function App() {
       </header>
 
       <main className="main-content">
-        <Section title="Default Layout Overview" description="Every new dashboard starts on your branded default layout." isOpen={sections.overview} onToggle={() => toggleSection('overview')}>
+        <Section title="Live Data Overview" description="The beta opens on a focused Apex command center with live profile context." isOpen={sections.overview} onToggle={() => toggleSection('overview')}>
           <div className="grid grid--hero">
             <Card className="hero-card">
               <div className="pill-row">
-                <Pill tone="gold">FalseTech Default Layout</Pill>
-                <Pill tone="purple">Apex-first creator home</Pill>
+                <Pill tone="gold">FalseTech Apex Dashboard v2 Beta</Pill>
+                <Pill tone="purple">Apex command center</Pill>
               </div>
-              <h2>Live Apex home base with your creator identity built in</h2>
+              <h2>Live Apex command center for profile stats, sessions, and squad decisions</h2>
               <p className="muted-copy">
-                This trial build keeps the product Apex-first while adding your music lane, squads, creator unlocks, and social identity.
-                New users start on your actual default layout so the product always feels like your board first.
+                This v2 beta keeps the product Apex-first with live profile stats, session review, legends intelligence,
+                weapons intelligence, friends, squads, music, creator tools, and settings in one local-first dashboard.
               </p>
               <div className="feature-grid">
                 {[
                   'Live profile switching',
-                  'Music lane on by default',
-                  'Hide music from player',
-                  'Re-enable from settings',
-                  'Squads as a first-class surface',
-                  'Creator unlock preview flow'
+                  'Session Review',
+                  'Legends intelligence',
+                  'Weapons intelligence',
+                  'Squads',
+                  'Creator Tools'
                 ].map((item) => (
                   <div key={item} className="feature-chip">{item}</div>
                 ))}
@@ -910,15 +910,15 @@ export default function App() {
             </Card>
 
             <div className="stack-column">
-              <Card><strong>Active profile</strong><p>{state.activeHandle} â€¢ {platformLabel(state.platformUi)}</p></Card>
-              <Card><strong>Default layout</strong><p>FalseTech Default Layout</p></Card>
+              <Card><strong>Active profile</strong><p>{state.activeHandle} | {platformLabel(state.platformUi)}</p></Card>
+              <Card><strong>Dashboard mode</strong><p>FalseTech Apex Dashboard v2 Beta</p></Card>
               <Card><strong>Last live sync</strong><p>{state.lastSync ? new Date(state.lastSync).toLocaleString() : 'Waiting for first refresh'}</p></Card>
               {state.syncError ? <Card><strong>Live status</strong><p>{state.syncError}</p></Card> : null}
             </div>
           </div>
         </Section>
 
-        <Section title="Live Data Engine" description="Open a profile, switch a friend, and the whole board refreshes around them." isOpen={sections.live} onToggle={() => toggleSection('live')}>
+        <Section title="Live Data" description="Open a profile, switch a friend, and refresh the board through the secure backend proxy." isOpen={sections.live} onToggle={() => toggleSection('live')}>
           <div className="grid grid--split">
             <Card>
               <h3>Live source</h3>
@@ -938,7 +938,7 @@ export default function App() {
             <Card>
               <h3>Refresh rules</h3>
               <div className="stack-column">
-                <Info title="On open" text="The dashboard opens on your default layout and immediately refreshes the active live profile." />
+                <Info title="On open" text="The dashboard opens on the Apex v2 beta command center and immediately refreshes the active live profile." />
                 <Info title="On focus" text="When the tab regains focus, the board refreshes again so visible numbers do not stay stale." />
                 <Info title="On friend switch" text="When a friend handle opens, the whole board refreshes around them." />
                 <Info title="On timer" text="The board refreshes every 60 seconds while it is open." />
@@ -947,13 +947,13 @@ export default function App() {
           </div>
         </Section>
 
-        <Section title="Music Lane" description="Your music sits on the dashboard by default and can be hidden from the player itself." isOpen={sections.music} onToggle={() => toggleSection('music')}>
+        <Section title="Music" description="Creator music is available in the dashboard and can be hidden or restored from Settings." isOpen={sections.music} onToggle={() => toggleSection('music')}>
           <div className="grid grid--split">
             <Card>
               <div className="card-header-inline">
                 <div>
-                  <h3>Default creator music player</h3>
-                  <p className="muted-copy">Visible by default on first load. Hide from here. Restore from Settings.</p>
+                  <h3>Creator music player</h3>
+                  <p className="muted-copy">Keep the player visible for creator sessions, or hide it from this card and restore it in Settings.</p>
                 </div>
                 {musicVisible ? <button className="button" onClick={() => setMusicVisible(false)}>Hide Player</button> : null}
               </div>
@@ -970,19 +970,19 @@ export default function App() {
                     />
                   </div>
                 ) : (
-                  <div className="music-placeholder">
+                  <div className="music-empty-state">
                     <h4>Spotify embed lane ready</h4>
                     <p>
-                      Paste your real Spotify embed URL in Settings to make the music lane fully live for the preview.
+                      Add a Spotify embed URL in Settings to turn this lane into a live creator player.
                     </p>
                     <div className="pill-row">
-                      <Pill>Music on by default</Pill>
-                      <Pill>Hide here, restore in settings</Pill>
+                      <Pill>Music</Pill>
+                      <Pill>Restore in Settings</Pill>
                     </div>
                   </div>
                 )
               ) : (
-                <div className="music-placeholder muted-state">
+                <div className="music-empty-state muted-state">
                   Music player hidden. Go to <strong>Settings</strong> to re-enable it.
                 </div>
               )}
@@ -990,7 +990,7 @@ export default function App() {
             <Card>
               <h3>Music behavior</h3>
               <div className="stack-column">
-                <Info title="Default" text="The music player appears on the dashboard by default because your music is part of the product identity." />
+                <Info title="Music" text="The music player supports the creator lane without requiring any Apex game integration." />
                 <Info title="Hide" text="A user can hide the player directly from the music card without leaving the dashboard." />
                 <Info title="Restore" text="To bring it back, the user goes into Settings and turns the music lane back on." />
               </div>
@@ -998,7 +998,7 @@ export default function App() {
           </div>
         </Section>
 
-        <Section title="Friends Live Profiles" description="Friends are just saved usernames. Click one and the entire board becomes their live dashboard." isOpen={sections.friends} onToggle={() => toggleSection('friends')}>
+        <Section title="Friends" description="Save player handles, switch profiles, and refresh live Apex stats without exposing keys in the frontend." isOpen={sections.friends} onToggle={() => toggleSection('friends')}>
           <div className="grid grid--split">
             <Card>
               <h3>Friend list</h3>
@@ -1014,7 +1014,7 @@ export default function App() {
                   {friends.map((friend) => (
                     <div key={friend} className="friend-chip">
                       <button onClick={() => handleOpenProfile(friend)}>{friend}</button>
-                      <button onClick={() => handleRemoveFriend(friend)} aria-label={`Remove ${friend}`}>Ã—</button>
+                      <button onClick={() => handleRemoveFriend(friend)} aria-label={`Remove ${friend}`}>x</button>
                     </div>
                   ))}
                 </div>
@@ -1023,10 +1023,10 @@ export default function App() {
             <Card>
               <h3>Friend flow</h3>
               <div className="stack-column">
-                <Info title="Step 1" text="Type a friendâ€™s Apex username once and add it to the list." />
+                <Info title="Step 1" text="Type a friend's Apex username once and add it to the list." />
                 <Info title="Step 2" text="Click the username whenever you want to switch the board to that live profile." />
                 <Info title="Step 3" text="The dashboard refreshes that live profile automatically, just like your own." />
-                <Info title="Result" text="The app feels socially useful without becoming a generic social-media clone." />
+                <Info title="Result" text="The app stays focused on Apex profile switching, session review, and squad context." />
               </div>
             </Card>
           </div>
@@ -1046,18 +1046,18 @@ export default function App() {
           </div>
         </Section>
 
-        <Section title="Creator Unlocks" description="Your default layout is the starting state. Custom layouts and extra saved templates unlock later." isOpen={sections.creator} onToggle={() => toggleSection('creator')}>
+        <Section title="Creator Tools" description="Creator controls keep music, sharing, and saved layouts separate from live Apex data." isOpen={sections.creator} onToggle={() => toggleSection('creator')}>
           <div className="grid grid--split">
             <Card>
               <h3>Layout access model</h3>
               <div className="metric-grid">
-                <MetricTile label="Starting layout" value="FalseTech Default Layout" />
+                <MetricTile label="Beta command center" value="FalseTech Apex v2" />
                 <MetricTile label="Saved custom layout slots" value={extraLayoutSlots} />
               </div>
               <div className="stack-column">
-                <Info title="Default rule" text="Every new dashboard opens on your actual default layout first so users know what the product looks like at its core." />
-                <Info title="Custom layout unlock" text="Custom layout building unlocks only after the preview logic marks Spotify subscribed and song added to playlist." />
-                <Info title="More saved templates" text="Sharing the app or your Spotify channel unlocks more saved layout slots in the preview logic." />
+                <Info title="Core view" text="The beta starts with live stats, sessions, legends, weapons, friends, squads, music, creator tools, and settings." />
+                <Info title="Custom layout unlock" text="Custom layout building can unlock after creator actions such as Spotify subscribe and playlist add events." />
+                <Info title="More saved layouts" text="Sharing the app or Spotify channel can unlock more saved layout slots in the beta logic." />
               </div>
             </Card>
             <Card>
@@ -1075,7 +1075,7 @@ export default function App() {
           </div>
         </Section>
 
-        <Section title="Competitive Command" description="Your optimizer DNA still sits inside the stronger creator and social shell." isOpen={sections.command} onToggle={() => toggleSection('command')}>
+        <Section title="Performance" description="Local performance targets and network notes stay advisory and safe to run while Apex is open." isOpen={sections.command} onToggle={() => toggleSection('command')}>
           <div className="grid grid--split">
             <div className="three-up-grid compact-grid">
               <Card><MetricTile label="FPS Target" value={`${fpsTarget} FPS`} /></Card>
@@ -1083,7 +1083,7 @@ export default function App() {
               <Card><MetricTile label="Display Cap" value={`${displayCap} Hz`} /></Card>
             </div>
             <Card>
-              <h3>Default layout command shell</h3>
+              <h3>Performance command shell</h3>
               <div className="slider-stack">
                 <Range label="FPS Target" value={fpsTarget} min={120} max={360} onChange={setFpsTarget} />
                 <Range label="Latency Target" value={latencyTarget} min={20} max={80} onChange={setLatencyTarget} />
@@ -1094,14 +1094,14 @@ export default function App() {
                   ['Display mode', 'Fullscreen'],
                   ['Reflex', 'Enabled + Boost'],
                   ['Streaming', 'Creator-safe'],
-                  ['Visibility bias', 'Competitive']
+                  ['Network', 'Ping and jitter checks only']
                 ].map(([label, value]) => <MetricTile key={label} label={label} value={value} />)}
               </div>
             </Card>
           </div>
         </Section>
 
-        <Section title="Legends Intel" description="Legend detail stays inside the same dashboard, no page drift." isOpen={sections.legends} onToggle={() => toggleSection('legends')}>
+        <Section title="Legends" description="Legend detail stays inside the same dashboard, with live profile context where available." isOpen={sections.legends} onToggle={() => toggleSection('legends')}>
           <div className="grid grid--split-wide">
             <div className="card-grid">
               {filteredLegends.map((legend) => (
@@ -1117,7 +1117,7 @@ export default function App() {
               ))}
             </div>
             <Card>
-              <h3>{selectedLegendRecord.name} â€¢ {selectedLegendRecord.fit}/100 fit</h3>
+              <h3>{selectedLegendRecord.name} | {selectedLegendRecord.fit}/100 fit</h3>
               <div className="stack-column">
                 <Info title="Passive" text={selectedLegendRecord.passive} />
                 <Info title="Tactical" text={selectedLegendRecord.tactical} />
@@ -1128,7 +1128,7 @@ export default function App() {
           </div>
         </Section>
 
-        <Section title="Weapons Lab" description="Weapon detail stays live-profile backed and visually active." isOpen={sections.weapons} onToggle={() => toggleSection('weapons')}>
+        <Section title="Weapons" description="Weapon intelligence stays profile-aware and visually active." isOpen={sections.weapons} onToggle={() => toggleSection('weapons')}>
           <div className="grid grid--split-wide">
             <div className="stack-column">
               <div className="card-grid">
@@ -1139,7 +1139,7 @@ export default function App() {
                     onClick={() => setSelectedWeapon(weapon.id)}
                   >
                     <strong>{weapon.name}</strong>
-                    <span>{weapon.class} â€¢ {weapon.ammo}</span>
+                    <span>{weapon.class} | {weapon.ammo}</span>
                     <p>{weapon.note}</p>
                   </button>
                 ))}
@@ -1150,7 +1150,7 @@ export default function App() {
               </Card>
             </div>
             <Card>
-              <h3>{selectedWeaponRecord.name} â€¢ {selectedWeaponRecord.tier} tier</h3>
+              <h3>{selectedWeaponRecord.name} | {selectedWeaponRecord.tier} tier</h3>
               <div className="metric-grid">
                 <MetricTile label="Range" value={selectedWeaponRecord.range} />
                 <MetricTile label="Fit" value={`${selectedWeaponRecord.fit}/100`} />
@@ -1166,7 +1166,7 @@ export default function App() {
           </div>
         </Section>
 
-        <Section title="Sessions Review" description="Session history follows the active live profile and stays visually readable." isOpen={sections.sessions} onToggle={() => toggleSection('sessions')}>
+        <Section title="Session Review" description="Session history follows the active live profile and stays visually readable." isOpen={sections.sessions} onToggle={() => toggleSection('sessions')}>
           <div className="grid grid--split-wide">
             <div className="stack-column">
               {filteredSessions.map((session) => (
@@ -1181,7 +1181,7 @@ export default function App() {
                       {session.delta >= 0 ? '+' : ''}{session.delta} RP
                     </span>
                   </div>
-                  <div className="session-card__meta">{session.time} â€¢ {session.map} â€¢ {session.placement}</div>
+                  <div className="session-card__meta">{session.time} | {session.map} | {session.placement}</div>
                   <p>{session.summary}</p>
                 </button>
               ))}
@@ -1191,7 +1191,7 @@ export default function App() {
               </Card>
             </div>
             <Card>
-              <h3>{selectedSessionRecord.legend} â€¢ {selectedSessionRecord.time}</h3>
+              <h3>{selectedSessionRecord.legend} | {selectedSessionRecord.time}</h3>
               <div className="metric-grid">
                 <MetricTile label="Placement" value={selectedSessionRecord.placement} />
                 <MetricTile label="Kills" value={selectedSessionRecord.kills} />
@@ -1200,6 +1200,7 @@ export default function App() {
               <div className="stack-column">
                 <Info title="Summary" text={selectedSessionRecord.summary} />
                 <div className="pill-row">{selectedSessionRecord.causes.map((item) => <Pill key={item}>{item}</Pill>)}</div>
+                <Info title="Match Notes" text="Use this review lane for player-owned notes, decisions, and follow-up work after each session." />
               </div>
             </Card>
           </div>

@@ -1,4 +1,4 @@
-# Apex Dashboard Beta Runbook
+# Apex Dashboard v2 Beta Runbook
 
 ## Final decision
 
@@ -24,7 +24,11 @@ Apex-Dashboard/
       verify.ps1              typecheck/build/API checks
       sanitize-local.ps1      remove generated local artifacts
   docs/
-    beta-runbook.md           beta operating guide
+    beta-runbook.md           local beta operating guide
+    public-beta-runbook.md    public web deployment guide
+    apex-dashboard-v2-map.md  frontend/backend route and feature map
+    local-companion-plan.md   optional safe Windows companion design
+    local-folder-map.md       local folder ownership guide
 ```
 
 ## First beta setup
@@ -59,6 +63,8 @@ http://localhost:5173/
 ```
 
 Leave the PowerShell window open while Apex is running. Press `Ctrl+C` after the session.
+
+The dashboard is safe to run while Apex Legends is open because the web app uses public profile data through the backend proxy. It does not bundle Apex Legends, read game memory, inject code, automate input, or bypass anti-cheat.
 
 ## Verify beta health
 
@@ -102,6 +108,8 @@ Remove local env too:
 - Do not commit `.env.local`.
 - Do not put Tracker/TRN API keys in the frontend.
 - Keep `TRN_API_KEY` only in Cloudflare Worker secrets or a local backend `.env` for authorized local backend testing.
+- Safe frontend env values are `VITE_API_BASE_URL`, `VITE_AUTH0_DOMAIN`, `VITE_AUTH0_CLIENT_ID`, `VITE_AUTH0_REDIRECT_URI`, and `VITE_AUTH0_LOGOUT_URI`.
+- Never commit `.env`, `.env.local`, secrets, API keys, tokens, `node_modules`, `dist`, `build`, cache folders, `.wrangler`, `.vite`, logs, or archives.
 - Do not read Apex memory, inject into the game, hook anti-cheat, or bypass protections.
 - Use safe external telemetry only: public API data, process state, local system metrics, network checks, and user-owned logs.
 
@@ -117,3 +125,10 @@ React dashboard on localhost:5173
 ## Known beta limitation
 
 The live Apex match data is only as good as the external API refresh cycle. A later Windows companion service can add safe local session tracking without touching game memory or anti-cheat.
+
+## Related beta docs
+
+- `docs/public-beta-runbook.md`
+- `docs/apex-dashboard-v2-map.md`
+- `docs/local-companion-plan.md`
+- `docs/local-folder-map.md`

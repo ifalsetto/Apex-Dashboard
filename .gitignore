@@ -28,6 +28,7 @@ secrets.*
 **/.cloudflare/
 **/.next/
 **/.turbo/
+*.tsbuildinfo
 
 # Local diagnostics and generated reports
 *.log
@@ -46,6 +47,10 @@ data/network/*.log
 # Local backups and one-off repair artifacts
 local_backups/
 LocalBackups/
+archives/
+Archives/
+reports/
+Reports/
 **/LocalRepairBackup_*/
 *.bak
 *.old.py
