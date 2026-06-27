@@ -1,6 +1,25 @@
-﻿import { useAuth0 } from "@auth0/auth0-react";
+import { useAuth0 } from "@auth0/auth0-react";
 
-export default function AuthPanel() {
+function localAppUrl(value?: string): string {
+  return value?.trim() || `${window.location.origin}/`;
+}
+
+function auth0Configured(): boolean {
+  return Boolean(
+    import.meta.env.VITE_AUTH0_DOMAIN?.trim() &&
+      import.meta.env.VITE_AUTH0_CLIENT_ID?.trim(),
+  );
+}
+
+function AuthPanelDisabled() {
+  return (
+    <section className="auth-panel auth-panel-muted">
+      <strong>Apex Operations Login:</strong> Local mode. Auth0 is not configured for this browser session.
+    </section>
+  );
+}
+
+function AuthPanelConnected() {
   const {
     isLoading,
     isAuthenticated,
@@ -10,23 +29,30 @@ export default function AuthPanel() {
     user,
   } = useAuth0();
 
-  const logoutUri =
-    import.meta.env.VITE_AUTH0_LOGOUT_URI || "http://localhost:5173/";
+  const redirectUri = localAppUrl(import.meta.env.VITE_AUTH0_REDIRECT_URI);
+  const logoutUri = localAppUrl(
+    import.meta.env.VITE_AUTH0_LOGOUT_URI || import.meta.env.VITE_AUTH0_REDIRECT_URI,
+  );
 
   const signup = () => {
-    loginWithRedirect({
+    void loginWithRedirect({
       authorizationParams: {
+        redirect_uri: redirectUri,
         screen_hint: "signup",
       },
     });
   };
 
   const login = () => {
-    loginWithRedirect();
+    void loginWithRedirect({
+      authorizationParams: {
+        redirect_uri: redirectUri,
+      },
+    });
   };
 
   const handleLogout = () => {
-    logout({
+    void logout({
       logoutParams: {
         returnTo: logoutUri,
       },
@@ -78,4 +104,12 @@ export default function AuthPanel() {
       </div>
     </section>
   );
+}
+
+export default function AuthPanel() {
+  if (!auth0Configured()) {
+    return <AuthPanelDisabled />;
+  }
+
+  return <AuthPanelConnected />;
 }
