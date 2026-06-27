@@ -1,0 +1,119 @@
+# Apex Dashboard Beta Runbook
+
+## Final decision
+
+Use a clean beta checkout outside the older development folders:
+
+```text
+C:\FalseTech\Beta\Apex Dashboard
+```
+
+This prevents stale Vite cache paths, locked repair folders, old `node_modules`, and accidental local artifacts from breaking the beta run.
+
+## Repo layout
+
+```text
+Apex-Dashboard/
+  FalseTech-Apex-Trial/
+    frontend/                 React + Vite dashboard
+    backend/                  Cloudflare Worker Tracker proxy
+  tools/
+    beta/
+      setup.ps1               clean clone/install/build
+      run.ps1                 start local beta dashboard
+      verify.ps1              typecheck/build/API checks
+      sanitize-local.ps1      remove generated local artifacts
+  docs/
+    beta-runbook.md           beta operating guide
+```
+
+## First beta setup
+
+From any PowerShell window:
+
+```powershell
+Set-ExecutionPolicy -Scope Process Bypass -Force
+New-Item -ItemType Directory -Force "C:\FalseTech\Beta" | Out-Null
+git clone https://github.com/ifalsetto/Apex-Dashboard.git "C:\FalseTech\Beta\Apex Dashboard"
+cd "C:\FalseTech\Beta\Apex Dashboard"
+.\tools\beta\setup.ps1
+```
+
+For a completely fresh rebuild:
+
+```powershell
+.\tools\beta\setup.ps1 -Fresh
+```
+
+## Run while playing Apex
+
+```powershell
+cd "C:\FalseTech\Beta\Apex Dashboard"
+.\tools\beta\run.ps1
+```
+
+Open:
+
+```text
+http://localhost:5173/
+```
+
+Leave the PowerShell window open while Apex is running. Press `Ctrl+C` after the session.
+
+## Verify beta health
+
+With the dashboard running in another terminal:
+
+```powershell
+cd "C:\FalseTech\Beta\Apex Dashboard"
+.\tools\beta\verify.ps1
+```
+
+Expected frontend result:
+
+```text
+Local dashboard HTTP status: 200 OK
+```
+
+If the API returns `FORBIDDEN`, the frontend and proxy path are working; Tracker rejected the Worker key or account access.
+
+## Sanitize local generated files
+
+Preview only:
+
+```powershell
+.\tools\beta\sanitize-local.ps1
+```
+
+Apply cleanup:
+
+```powershell
+.\tools\beta\sanitize-local.ps1 -Apply
+```
+
+Remove local env too:
+
+```powershell
+.\tools\beta\sanitize-local.ps1 -Apply -IncludeLocalEnv
+```
+
+## Security rules
+
+- Do not commit `.env.local`.
+- Do not put Tracker/TRN API keys in the frontend.
+- Keep `TRN_API_KEY` only in Cloudflare Worker secrets or a local backend `.env` for authorized local backend testing.
+- Do not read Apex memory, inject into the game, hook anti-cheat, or bypass protections.
+- Use safe external telemetry only: public API data, process state, local system metrics, network checks, and user-owned logs.
+
+## Current beta API flow
+
+```text
+React dashboard on localhost:5173
+  -> Vite /api proxy
+  -> Cloudflare Worker
+  -> Tracker API
+```
+
+## Known beta limitation
+
+The live Apex match data is only as good as the external API refresh cycle. A later Windows companion service can add safe local session tracking without touching game memory or anti-cheat.
