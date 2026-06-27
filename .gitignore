@@ -63,3 +63,9 @@ data/network/*.log
 *DxDiag*.txt
 diagnostics/
 reports/local/
+
+# Local environment files
+.env
+.env.local
+.env.*.local
+!.env.example
