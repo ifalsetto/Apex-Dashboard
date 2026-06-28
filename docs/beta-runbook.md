@@ -123,6 +123,35 @@ React dashboard on localhost:5173
   -> Tracker API
 ```
 
+## Future Tracker OAuth Plan
+
+Tracker Network OAuth is not implemented in the current dashboard and must not block the current beta. Do not add Tracker `client_secret` values to React, do not add fake OAuth endpoints, and do not hardcode Tracker authorization URLs, token URLs, scopes, or redirect URIs.
+
+Keep Auth0/local beta auth separate from any future Tracker OAuth work. Auth0 can continue to protect or identify the local beta app, while Tracker OAuth would be a separate server-side integration for Tracker account authorization only.
+
+Secure future flow, once official Tracker OAuth details are available:
+
+1. Frontend opens `GET /api/auth/login`.
+2. Worker creates a signed state value.
+3. Worker redirects to the official Tracker authorization URL.
+4. Tracker redirects to `/api/auth/callback`.
+5. Worker verifies the signed state.
+6. Worker exchanges the authorization code server-side.
+7. Worker stores the token/session securely.
+8. Worker sets an HTTP-only `SameSite=Lax` secure session cookie.
+9. Frontend calls `/api/auth/me`.
+10. Frontend never sees `client_secret`.
+
+OAuth remains blocked until Tracker provides official details for:
+
+- `client_id`
+- `client_secret`
+- authorization endpoint
+- token endpoint
+- scopes
+- redirect URI requirements
+- token expiration and refresh behavior
+
 ## Known beta limitation
 
 The live Apex match data is only as good as the external API refresh cycle. A later Windows companion service can add safe local session tracking without touching game memory or anti-cheat.
