@@ -14,7 +14,7 @@ function auth0Configured(): boolean {
 function AuthPanelDisabled() {
   return (
     <section className="auth-panel auth-panel-muted">
-      <strong>Apex Operations Login:</strong> Local mode. Auth0 is not configured for this browser session.
+      <strong>FalseTech Apex Dashboard v2 Beta:</strong> Local mode. Auth0 is not configured for this browser session.
     </section>
   );
 }
@@ -62,7 +62,7 @@ function AuthPanelConnected() {
   if (isLoading) {
     return (
       <section className="auth-panel">
-        <strong>Apex Login:</strong> Loading authentication...
+        <strong>Apex Dashboard Login:</strong> Loading authentication...
       </section>
     );
   }
@@ -78,7 +78,7 @@ function AuthPanelConnected() {
   if (!isAuthenticated) {
     return (
       <section className="auth-panel">
-        <strong>Apex Operations Login</strong>
+        <strong>Apex Dashboard Login</strong>
 
         <div className="auth-panel-actions">
           <button type="button" onClick={login}>

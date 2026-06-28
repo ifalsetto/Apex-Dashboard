@@ -269,7 +269,7 @@ button {
 .session-card,
 .friend-chip,
 .update-card,
-.music-placeholder,
+.music-empty-state,
 .empty-box,
 .unlock-state,
 .info-block,
@@ -286,7 +286,7 @@ button {
 .session-card,
 .update-card,
 .info-block,
-.music-placeholder,
+.music-empty-state,
 .empty-box,
 .unlock-state {
   box-shadow: var(--shadow);
@@ -548,13 +548,13 @@ button {
   color: var(--muted-strong);
 }
 
-.music-placeholder,
+.music-empty-state,
 .empty-box,
 .unlock-state {
   padding: 1rem;
 }
 
-.music-placeholder strong,
+.music-empty-state strong,
 .unlock-state strong {
   color: var(--text);
 }

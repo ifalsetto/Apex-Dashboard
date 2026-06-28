@@ -1,21 +1,25 @@
-# FalseTech Apex Elite Dashboard — Trial Build
+# FalseTech Apex Dashboard v2 Beta
 
-This is a full V1 trial build for company preview.
+This is the public beta-ready Vite + React dashboard and Cloudflare Worker proxy for FalseTech Apex Dashboard v2 Beta.
 
 It is designed as:
-- Apex-first companion app
+- local-first Apex command center
 - royal purple + gold brand system
 - live player profiles
-- live friend switching by username
-- music lane on by default
-- squads + creator identity surfaces
-- default layout first
-- creator unlock preview logic
+- friend profile switching by username
+- legends intelligence
+- weapons intelligence
+- session review
+- music lane
+- squads
+- creator tools
+- settings
+- secure backend proxy with no Tracker key in the frontend
 
 ## Project structure
 
-- `frontend/` — Vite + React trial app
-- `backend/` — Cloudflare Worker proxy for Tracker.gg
+- `frontend/` - Vite + React dashboard
+- `backend/` - Cloudflare Worker proxy for Tracker.gg
 
 ## Why the backend exists
 
@@ -80,7 +84,7 @@ ALLOWED_ORIGINS = "https://your-frontend-domain.com,http://localhost:5173"
 npm run deploy
 ```
 
-## What is real vs preview-only in this build
+## What is real vs beta-only in this build
 
 ### Real
 - live player lookup
@@ -91,30 +95,34 @@ npm run deploy
 - automatic refresh behavior
 - music hide/show rule
 
-### Preview / investor-demo logic
+### Beta-only workflow logic
 - Spotify subscription verification
 - song-added-to-playlist verification
 - app-share verification
 - Spotify-channel-share verification
 - creator unlocks based on those actions
 
-Those are intentionally shown as preview logic for the trial build.
+Those controls are local UI state in the beta until real provider verification is added.
 
 ## Best demo flow
 
 1. Open the dashboard
-2. Show the default layout identity
+2. Show the FalseTech Apex Dashboard v2 Beta command center
 3. Search/open a live player
 4. Switch to a saved friend username
-5. Show legends / weapons / sessions panels
-6. Show music lane default behavior
-7. Show creator unlock preview controls
+5. Show Legends, Weapons, and Session Review
+6. Show Music
+7. Show Creator Tools
 8. Explain how backend security keeps the Tracker key hidden
 
-## Suggested next steps after the trial build
+## Suggested next steps after public beta
 
 1. wire a real Spotify embed URL
-2. add frontend proxy config for local dev
+2. publish the frontend through Cloudflare Pages
 3. add true layout saving
 4. wire actual Spotify/auth/share verification later
 5. add compare-two-player mode
+
+## Safety boundary
+
+Do not bundle Apex Legends. Users install Apex separately through Steam or EA. This app does not read game memory, inject code, hook anti-cheat, bypass protections, automate gameplay, or store secrets in frontend code.
