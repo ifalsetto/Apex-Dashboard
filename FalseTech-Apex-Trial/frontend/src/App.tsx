@@ -3,6 +3,7 @@ import { useEffect, useReducer, useState } from 'react';
 
 type PlatformUi = 'steam' | 'xbl' | 'psn';
 type PlatformApi = 'origin' | 'xbl' | 'psn';
+type ProviderId = 'tracker' | 'mozambique' | 'mock';
 type TabKey =
   | 'command'
   | 'live'
@@ -112,11 +113,25 @@ type DashboardAction =
 
 type StandardApiResponse<T> = {
   ok: boolean;
-  source: 'tracker';
+  source: ProviderId;
   cached: boolean;
   data?: T;
   error?: { code: string; message: string };
-  meta: Record<string, unknown>;
+  meta: {
+    path?: string;
+    platform?: string;
+    player?: string;
+    query?: string;
+    segmentType?: string;
+    fetchedAt?: string;
+    provider?: ProviderId;
+    providerChain?: Array<{
+      provider: ProviderId;
+      status: 'hit' | 'failed' | 'skipped' | 'blocked';
+      code?: string;
+      message?: string;
+    }>;
+  };
 };
 
 type TrackerProfileResponse = {
@@ -144,13 +159,19 @@ type TrackerSessionsResponse = {
   };
 };
 
-type TrackerSearchResponse = {
-  data?: Array<{
-    platformId?: number;
-    platformSlug?: string;
-    platformUserHandle?: string;
-  }>;
+type TrackerSearchItem = {
+  platformId?: number;
+  platformSlug?: string;
+  platformUserHandle?: string;
 };
+
+type TrackerSearchResponse =
+  | TrackerSearchItem[]
+  | {
+      data?: TrackerSearchItem[];
+      results?: TrackerSearchItem[];
+      players?: TrackerSearchItem[];
+    };
 
 const STORAGE = {
   handle: 'falsetech-active-handle-v1',
@@ -441,7 +462,12 @@ class ApiRequestError extends Error {
 }
 
 async function fetchStandard<T>(url: string): Promise<StandardApiResponse<T>> {
-  const response = await fetch(url);
+  const response = await fetch(url, {
+    method: 'GET',
+    headers: {
+      Accept: 'application/json'
+    }
+  });
   let body: StandardApiResponse<T> | null = null;
 
   try {
@@ -551,7 +577,9 @@ function normalizeSessions(sessionsPayload: TrackerSessionsResponse | undefined)
 }
 
 function extractSearchHandle(searchPayload: TrackerSearchResponse | undefined, fallback: string): string {
-  const items = searchPayload?.data ?? [];
+  const items = Array.isArray(searchPayload)
+    ? searchPayload
+    : searchPayload?.data ?? searchPayload?.results ?? searchPayload?.players ?? [];
   if (!items.length) return fallback;
   return readText(items[0].platformUserHandle, fallback);
 }
@@ -807,14 +835,17 @@ export default function App() {
     dispatch({ type: 'SYNC_START' });
     try {
       const platformApi = platformToApi(state.platformUi);
-      const [searchRes, profileRes, sessionsRes, legendRes] = await Promise.all([
-        fetchStandard<TrackerSearchResponse>(`/api/apex/search?platform=${platformApi}&query=${encodeURIComponent(handle)}`),
-        fetchStandard<TrackerProfileResponse>(`/api/apex/profile/${platformApi}/${encodeURIComponent(handle)}`),
-        fetchStandard<TrackerSessionsResponse>(`/api/apex/profile/${platformApi}/${encodeURIComponent(handle)}/sessions`),
-        fetchStandard<TrackerProfileResponse>(`/api/apex/profile/${platformApi}/${encodeURIComponent(handle)}/segments/legend`)
+      const searchRes = await fetchStandard<TrackerSearchResponse>(
+        `/api/apex/search?platform=${platformApi}&query=${encodeURIComponent(handle)}`
+      );
+      const canonicalHandle = extractSearchHandle(searchRes.data, handle);
+      const encodedHandle = encodeURIComponent(canonicalHandle);
+      const [profileRes, sessionsRes, legendRes] = await Promise.all([
+        fetchStandard<TrackerProfileResponse>(`/api/apex/profile/${platformApi}/${encodedHandle}`),
+        fetchStandard<TrackerSessionsResponse>(`/api/apex/profile/${platformApi}/${encodedHandle}/sessions`),
+        fetchStandard<TrackerProfileResponse>(`/api/apex/profile/${platformApi}/${encodedHandle}/segments/legend`)
       ]);
 
-      const canonicalHandle = extractSearchHandle(searchRes.data, handle);
       dispatch({ type: 'SET_ACTIVE_HANDLE', handle: canonicalHandle });
       dispatch({
         type: 'SYNC_SUCCESS',
@@ -1000,7 +1031,7 @@ export default function App() {
                 <button className="button" onClick={() => dispatch({ type: 'SET_PLATFORM', platformUi: 'xbl' })}>Xbox</button>
                 <button className="button" onClick={() => dispatch({ type: 'SET_PLATFORM', platformUi: 'psn' })}>PlayStation</button>
               </div>
-              <p className="fine-print">Steam users are shown as Steam / EA in the UI, but the backend uses the Tracker-compatible PC route.</p>
+              <p className="fine-print">Steam users are shown as Steam / EA in the UI, but the backend uses the Tracker-compatible origin route.</p>
             </Card>
             <Card>
               <h3>Refresh rules</h3>
