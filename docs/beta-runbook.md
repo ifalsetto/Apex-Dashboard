@@ -107,8 +107,9 @@ Remove local env too:
 
 - Do not commit `.env.local`.
 - Do not put Tracker/TRN API keys in the frontend.
-- Keep `TRN_API_KEY` only in Cloudflare Worker secrets or a local backend `.env` for authorized local backend testing.
-- Safe frontend env values are `VITE_API_BASE_URL`, `VITE_AUTH0_DOMAIN`, `VITE_AUTH0_CLIENT_ID`, `VITE_AUTH0_REDIRECT_URI`, and `VITE_AUTH0_LOGOUT_URI`.
+- Keep `TRN_API_KEY` only in Cloudflare Worker secrets or the local Worker backend env used for authorized backend testing.
+- Do not use a frontend API base URL env var. React must call relative `/api/apex/*` routes only, with local proxy/backend routing outside the browser bundle.
+- Safe frontend env values are `VITE_AUTH0_DOMAIN`, `VITE_AUTH0_CLIENT_ID`, `VITE_AUTH0_REDIRECT_URI`, and `VITE_AUTH0_LOGOUT_URI`.
 - Never commit `.env`, `.env.local`, secrets, API keys, tokens, `node_modules`, `dist`, `build`, cache folders, `.wrangler`, `.vite`, logs, or archives.
 - Do not read Apex memory, inject into the game, hook anti-cheat, or bypass protections.
 - Use safe external telemetry only: public API data, process state, local system metrics, network checks, and user-owned logs.
