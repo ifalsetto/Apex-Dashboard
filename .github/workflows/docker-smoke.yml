@@ -11,6 +11,8 @@ on:
       - apex_dashboard.py
       - false_apex_ai.py
       - pages/**
+      - FalseTech-Apex-Trial/frontend/**
+      - FalseTech-Apex-Trial/backend/**
       - .github/workflows/docker-smoke.yml
   push:
     branches:
@@ -24,11 +26,28 @@ on:
       - apex_dashboard.py
       - false_apex_ai.py
       - pages/**
+      - FalseTech-Apex-Trial/frontend/**
+      - FalseTech-Apex-Trial/backend/**
       - .github/workflows/docker-smoke.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
   docker-smoke:
     runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      COMPOSE_PROJECT_NAME: apex-dashboard-ci
+      COMPOSE_DISABLE_ENV_FILE: "1"
+      APEX_BACKEND_PORT: 8787
+      APEX_FRONTEND_PORT: 5173
+      ALLOWED_ORIGINS: http://localhost:5173,http://127.0.0.1:5173
+      TRN_API_KEY: ""
+      TRACKER_API_KEY: ""
+      OPENAI_API_KEY: ""
+
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -36,30 +55,66 @@ jobs:
       - name: Validate Compose config
         run: docker compose config
 
-      - name: Build Docker image
-        run: docker build -t apex-dashboard:ci .
+      - name: Build frontend image
+        run: docker compose build frontend
 
-      - name: Start container
-        run: |
-          docker run -d \
-            --name apex-dashboard \
-            -p 8501:8501 \
-            -e APEX_DASHBOARD_DATA_DIR=/data \
-            apex-dashboard:ci
+      - name: Build backend image
+        run: docker compose build backend
 
-      - name: Wait for Streamlit health endpoint
+      - name: Start backend and frontend services
         run: |
-          for i in {1..30}; do
-            if curl -fsS http://127.0.0.1:8501/_stcore/health; then
-              echo "Apex Dashboard container is healthy."
+          docker compose up -d backend frontend
+          docker compose ps
+
+      - name: Check backend health endpoint
+        run: |
+          for i in {1..40}; do
+            if curl -fsS http://127.0.0.1:8787/health; then
+              echo "Backend health endpoint is reachable."
               exit 0
             fi
             sleep 2
           done
-          echo "Apex Dashboard did not become healthy in time."
-          docker logs apex-dashboard
+
+          echo "Backend health endpoint did not become reachable in time."
+          docker compose ps
+          docker compose logs backend
           exit 1
 
-      - name: Stop container
+      - name: Check frontend endpoint
+        run: |
+          for i in {1..40}; do
+            if curl -fsSI http://127.0.0.1:5173/; then
+              echo "Frontend endpoint is reachable."
+              exit 0
+            fi
+            sleep 2
+          done
+
+          echo "Frontend endpoint did not become reachable in time."
+          docker compose ps
+          docker compose logs frontend
+          exit 1
+
+      - name: Legacy Streamlit smoke test
+        continue-on-error: true
+        run: |
+          docker compose build apex-dashboard
+          docker compose up -d apex-dashboard
+
+          for i in {1..30}; do
+            if curl -fsS http://127.0.0.1:8501/_stcore/health; then
+              echo "Legacy Streamlit endpoint is reachable."
+              exit 0
+            fi
+            sleep 2
+          done
+
+          echo "Legacy Streamlit endpoint did not become reachable in time."
+          docker compose ps
+          docker compose logs apex-dashboard
+          exit 1
+
+      - name: Stop services
         if: always()
-        run: docker rm -f apex-dashboard || true
+        run: docker compose down -v --remove-orphans
