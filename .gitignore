@@ -5,6 +5,11 @@ __pycache__/
 *.pyo
 .pytest_cache/
 .mypy_cache/
+.ruff_cache/
+.cache/
+*.cache
+.coverage
+htmlcov/
 
 # Local secrets and machine-specific config
 .env
@@ -29,13 +34,19 @@ secrets.*
 **/.next/
 **/.turbo/
 *.tsbuildinfo
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
 
 # Local diagnostics and generated reports
 *.log
+*.tmp
+*.temp
 *dxdiag*.txt
 *DxDiag*.txt
 diagnostics/
 reports/local/
+local_reports/
 profile_autosave.json
 
 # Local network/system exports
@@ -43,6 +54,11 @@ data/network/*.json
 data/network/*.jsonl
 data/network/*.log
 !data/network/.gitkeep
+Snapshots/*.json
+Exports/
+Scans/
+AI_Coach_Reports/
+StorageMap/
 
 # Local backups and one-off repair artifacts
 local_backups/
