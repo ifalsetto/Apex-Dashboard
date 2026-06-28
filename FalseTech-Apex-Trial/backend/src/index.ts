@@ -5,10 +5,19 @@ export interface Env {
 
 type PlatformKey = 'origin' | 'xbl' | 'psn';
 type CacheBucket = 'search' | 'profile' | 'sessions' | 'segments';
+type ProviderId = 'tracker' | 'mozambique' | 'mock';
+type ProviderAttemptStatus = 'hit' | 'failed' | 'skipped' | 'blocked';
+
+type ProviderAttempt = {
+  provider: ProviderId;
+  status: ProviderAttemptStatus;
+  code?: string;
+  message?: string;
+};
 
 type StandardApiResponse<T> = {
   ok: boolean;
-  source: 'tracker';
+  source: ProviderId;
   cached: boolean;
   data?: T;
   error?: {
@@ -22,10 +31,12 @@ type StandardApiResponse<T> = {
     query?: string;
     segmentType?: string;
     fetchedAt: string;
+    provider?: ProviderId;
+    providerChain?: ProviderAttempt[];
   };
 };
 
-const API_BASE = 'https://public-api.tracker.gg/v2/apex/standard';
+const TRACKER_API_BASE = 'https://public-api.tracker.gg/v2/apex/standard';
 const VALID_PLATFORMS = new Set<PlatformKey>(['origin', 'xbl', 'psn']);
 const HANDLE_PATTERN = /^[A-Za-z0-9 _\-.\[\]\(\)~]{1,64}$/;
 const SEGMENT_PATTERN = /^[a-z0-9_-]{1,32}$/i;
@@ -60,16 +71,10 @@ export default {
         data: {
           service: 'falsetech-apex-tracker-proxy',
           trackerConfigured: Boolean(env.TRN_API_KEY),
+          providers: providerStatus(env),
           now: new Date().toISOString()
         },
         meta: { path: url.pathname, fetchedAt: new Date().toISOString() }
-      });
-    }
-
-    if (!env.TRN_API_KEY) {
-      return errorResponse(request, env, 503, 'TRACKER_NOT_CONFIGURED', 'Tracker integration is not configured', {
-        path: url.pathname,
-        fetchedAt: new Date().toISOString()
       });
     }
 
@@ -111,25 +116,35 @@ export default {
     }
 
     if (!tail) {
-      return proxyRoute({
+      return providerRoute({
         request,
         env,
         ctx,
         cacheBucket: 'profile',
         cacheKeyPath: url.pathname,
-        upstreamUrl: `${API_BASE}/profile/${platform}/${encodeURIComponent(player)}`,
+        providerRequest: {
+          routeKind: 'profile',
+          trackerPath: `/profile/${platform}/${encodeURIComponent(player)}`,
+          platform,
+          player
+        },
         meta: { path: url.pathname, platform, player, fetchedAt: new Date().toISOString() }
       });
     }
 
     if (tail === 'sessions') {
-      return proxyRoute({
+      return providerRoute({
         request,
         env,
         ctx,
         cacheBucket: 'sessions',
         cacheKeyPath: url.pathname,
-        upstreamUrl: `${API_BASE}/profile/${platform}/${encodeURIComponent(player)}/sessions`,
+        providerRequest: {
+          routeKind: 'sessions',
+          trackerPath: `/profile/${platform}/${encodeURIComponent(player)}/sessions`,
+          platform,
+          player
+        },
         meta: { path: url.pathname, platform, player, fetchedAt: new Date().toISOString() }
       });
     }
@@ -146,13 +161,19 @@ export default {
         });
       }
 
-      return proxyRoute({
+      return providerRoute({
         request,
         env,
         ctx,
         cacheBucket: 'segments',
         cacheKeyPath: url.pathname,
-        upstreamUrl: `${API_BASE}/profile/${platform}/${encodeURIComponent(player)}/segments/${encodeURIComponent(segmentType)}`,
+        providerRequest: {
+          routeKind: 'segments',
+          trackerPath: `/profile/${platform}/${encodeURIComponent(player)}/segments/${encodeURIComponent(segmentType)}`,
+          platform,
+          player,
+          segmentType
+        },
         meta: { path: url.pathname, platform, player, segmentType, fetchedAt: new Date().toISOString() }
       });
     }
@@ -186,13 +207,18 @@ async function handleSearch(request: Request, env: Env, ctx: ExecutionContext, u
     });
   }
 
-  return proxyRoute({
+  return providerRoute({
     request,
     env,
     ctx,
     cacheBucket: 'search',
     cacheKeyPath: `/api/apex/search?platform=${platform}&query=${encodeURIComponent(query)}`,
-    upstreamUrl: `${API_BASE}/search?platform=${platform}&query=${encodeURIComponent(query)}`,
+    providerRequest: {
+      routeKind: 'search',
+      trackerPath: `/search?platform=${platform}&query=${encodeURIComponent(query)}`,
+      platform,
+      query
+    },
     meta: {
       path: '/api/apex/search',
       platform,
@@ -202,18 +228,18 @@ async function handleSearch(request: Request, env: Env, ctx: ExecutionContext, u
   });
 }
 
-type ProxyRouteArgs = {
+type ProviderRouteArgs = {
   request: Request;
   env: Env;
   ctx: ExecutionContext;
   cacheBucket: CacheBucket;
   cacheKeyPath: string;
-  upstreamUrl: string;
+  providerRequest: ProviderRequest;
   meta: StandardApiResponse<unknown>['meta'];
 };
 
-async function proxyRoute(args: ProxyRouteArgs): Promise<Response> {
-  const { request, env, ctx, cacheBucket, cacheKeyPath, upstreamUrl, meta } = args;
+async function providerRoute(args: ProviderRouteArgs): Promise<Response> {
+  const { request, env, ctx, cacheBucket, cacheKeyPath, providerRequest, meta } = args;
   const cache = caches.default;
   const cacheKey = buildCacheKey(request, cacheKeyPath);
   const cached = await cache.match(cacheKey);
@@ -228,13 +254,17 @@ async function proxyRoute(args: ProxyRouteArgs): Promise<Response> {
   }
 
   try {
-    const upstream = await fetchTracker(upstreamUrl, env.TRN_API_KEY);
+    const providerResult = await fetchProviderData(env, providerRequest);
     const payload: StandardApiResponse<unknown> = {
       ok: true,
-      source: 'tracker',
+      source: providerResult.provider,
       cached: false,
-      data: upstream,
-      meta
+      data: providerResult.data,
+      meta: {
+        ...meta,
+        provider: providerResult.provider,
+        providerChain: providerResult.attempts
+      }
     };
     const response = jsonResponse(request, env, 200, payload, {
       'Cache-Control': `public, max-age=${CACHE_TTL[cacheBucket]}`,
@@ -243,22 +273,161 @@ async function proxyRoute(args: ProxyRouteArgs): Promise<Response> {
     ctx.waitUntil(cache.put(cacheKey, response.clone()));
     return response;
   } catch (error) {
-    if (error instanceof TrackerHttpError) {
-      return errorResponse(request, env, error.status, error.code, error.message, meta);
+    if (error instanceof ProviderChainError) {
+      return errorResponse(request, env, error.status, error.code, error.message, {
+        ...meta,
+        provider: error.provider,
+        providerChain: error.attempts
+      });
     }
     return errorResponse(request, env, 502, 'TRACKER_PROXY_FAILURE', 'Tracker proxy failure', meta);
   }
 }
 
-class TrackerHttpError extends Error {
+type ProviderRequest = {
+  routeKind: CacheBucket;
+  trackerPath: string;
+  platform: PlatformKey;
+  player?: string;
+  query?: string;
+  segmentType?: string;
+};
+
+type ProviderResult = {
+  provider: ProviderId;
+  data: unknown;
+  attempts: ProviderAttempt[];
+};
+
+type ApexDataProvider = {
+  id: ProviderId;
+  label: string;
+  configured: (env: Env) => boolean;
+  fetch: (env: Env, request: ProviderRequest) => Promise<unknown>;
+};
+
+class ProviderHttpError extends Error {
   status: number;
   code: string;
+  provider: ProviderId;
+  terminal: boolean;
 
-  constructor(status: number, code: string, message: string) {
+  constructor(provider: ProviderId, status: number, code: string, message: string, terminal = false) {
     super(message);
+    this.name = 'ProviderHttpError';
+    this.provider = provider;
     this.status = status;
     this.code = code;
+    this.terminal = terminal;
   }
+}
+
+class ProviderChainError extends Error {
+  status: number;
+  code: string;
+  provider: ProviderId;
+  attempts: ProviderAttempt[];
+
+  constructor(error: ProviderHttpError, attempts: ProviderAttempt[]) {
+    super(error.message);
+    this.name = 'ProviderChainError';
+    this.status = error.status;
+    this.code = error.code;
+    this.provider = error.provider;
+    this.attempts = attempts;
+  }
+}
+
+const trackerProvider: ApexDataProvider = {
+  id: 'tracker',
+  label: 'Tracker Provider',
+  configured: (env) => Boolean(env.TRN_API_KEY),
+  async fetch(env, request) {
+    if (!env.TRN_API_KEY) {
+      throw new ProviderHttpError('tracker', 503, 'TRACKER_NOT_CONFIGURED', 'Tracker integration is not configured', true);
+    }
+    return fetchTracker(`${TRACKER_API_BASE}${request.trackerPath}`, env.TRN_API_KEY);
+  }
+};
+
+const mozambiqueProvider: ApexDataProvider = {
+  id: 'mozambique',
+  label: 'Mozambique / Apex Legends Status Provider',
+  configured: () => false,
+  async fetch() {
+    throw new ProviderHttpError(
+      'mozambique',
+      503,
+      'FALLBACK_PROVIDER_NOT_CONFIGURED',
+      'Mozambique / Apex Legends Status provider is not configured'
+    );
+  }
+};
+
+const mockProvider: ApexDataProvider = {
+  id: 'mock',
+  label: 'Mock Provider',
+  configured: () => true,
+  async fetch(_env, request) {
+    return mockProviderData(request);
+  }
+};
+
+const PROVIDERS: ApexDataProvider[] = [trackerProvider, mozambiqueProvider, mockProvider];
+
+async function fetchProviderData(env: Env, request: ProviderRequest): Promise<ProviderResult> {
+  const attempts: ProviderAttempt[] = [];
+  let firstError: ProviderHttpError | null = null;
+
+  for (const provider of PROVIDERS) {
+    if (!provider.configured(env)) {
+      attempts.push({
+        provider: provider.id,
+        status: 'skipped',
+        code: 'PROVIDER_NOT_CONFIGURED',
+        message: `${provider.label} is not configured`
+      });
+      continue;
+    }
+
+    try {
+      const data = await provider.fetch(env, request);
+      attempts.push({ provider: provider.id, status: 'hit' });
+      return { provider: provider.id, data, attempts };
+    } catch (error) {
+      const providerError = normalizeProviderError(provider.id, error);
+      attempts.push({
+        provider: provider.id,
+        status: providerError.terminal ? 'blocked' : 'failed',
+        code: providerError.code,
+        message: providerError.message
+      });
+      firstError ??= providerError;
+      if (providerError.terminal) break;
+    }
+  }
+
+  throw new ProviderChainError(
+    firstError ?? new ProviderHttpError('tracker', 502, 'PROVIDER_CHAIN_FAILURE', 'Provider chain failure'),
+    attempts
+  );
+}
+
+function normalizeProviderError(provider: ProviderId, error: unknown): ProviderHttpError {
+  if (error instanceof ProviderHttpError) return error;
+  if (error instanceof Error) {
+    return new ProviderHttpError(provider, 502, 'PROVIDER_FAILURE', error.message);
+  }
+  return new ProviderHttpError(provider, 502, 'PROVIDER_FAILURE', 'Provider failure');
+}
+
+function providerStatus(env: Env) {
+  return PROVIDERS.map((provider, index) => ({
+    id: provider.id,
+    label: provider.label,
+    priority: index + 1,
+    configured: provider.configured(env)
+  }));
 }
 
 async function fetchTracker(url: string, apiKey: string): Promise<unknown> {
@@ -275,26 +444,102 @@ async function fetchTracker(url: string, apiKey: string): Promise<unknown> {
   });
 
   if (!response.ok) {
-    throw mapUpstreamError(response.status);
+    throw mapUpstreamError('tracker', response.status);
   }
 
   return response.json();
 }
 
-function mapUpstreamError(status: number): TrackerHttpError {
+function mapUpstreamError(provider: ProviderId, status: number): ProviderHttpError {
   switch (status) {
     case 400:
-      return new TrackerHttpError(400, 'BAD_REQUEST', 'Bad request to Tracker');
+      return new ProviderHttpError(provider, 400, 'BAD_REQUEST', 'Bad request to Tracker', true);
     case 401:
-      return new TrackerHttpError(401, 'UNAUTHORIZED', 'Unauthorized upstream request');
+      return new ProviderHttpError(provider, 401, 'UNAUTHORIZED', 'Unauthorized upstream request', true);
     case 403:
-      return new TrackerHttpError(403, 'FORBIDDEN', 'Tracker access forbidden');
+      return new ProviderHttpError(provider, 403, 'FORBIDDEN', 'Tracker access forbidden', true);
     case 404:
-      return new TrackerHttpError(404, 'PLAYER_NOT_FOUND', 'Player not found');
+      return new ProviderHttpError(provider, 404, 'PLAYER_NOT_FOUND', 'Player not found', true);
     case 429:
-      return new TrackerHttpError(429, 'RATE_LIMITED', 'Tracker rate limit reached');
+      return new ProviderHttpError(provider, 429, 'RATE_LIMITED', 'Tracker rate limit reached');
     default:
-      return new TrackerHttpError(502, 'TRACKER_PROXY_FAILURE', 'Tracker proxy failure');
+      return new ProviderHttpError(provider, 502, 'TRACKER_PROXY_FAILURE', 'Tracker proxy failure');
+  }
+}
+
+function mockProviderData(request: ProviderRequest): unknown {
+  switch (request.routeKind) {
+    case 'search':
+      return [
+        {
+          platformSlug: request.platform,
+          platformUserHandle: request.query ?? request.player ?? 'NotFalsetto'
+        }
+      ];
+    case 'profile':
+      return {
+        data: {
+          platformInfo: {
+            platformSlug: request.platform,
+            platformUserHandle: request.player ?? 'NotFalsetto'
+          },
+          metadata: { activeLegendName: 'Lifeline' },
+          segments: [
+            {
+              type: 'overview',
+              stats: {
+                level: { value: 894, displayValue: '894' },
+                rankScore: { value: 12350, displayValue: 'Diamond 4', metadata: { rankName: 'Diamond 4' } },
+                matchesPlayed: { value: 1050, displayValue: '1,050' },
+                kills: { value: 2646, displayValue: '2,646' },
+                damage: { value: 1893101, displayValue: '1,893,101' },
+                wins: { value: 68, displayValue: '68' }
+              }
+            }
+          ]
+        }
+      };
+    case 'sessions':
+      return {
+        data: {
+          items: [
+            {
+              metadata: { legendName: 'Horizon', mapName: 'Olympus', timestamp: 'Preview session' },
+              stats: {
+                placement: { displayValue: '#4' },
+                rankPoints: { value: 45, displayValue: '+45' },
+                kills: { value: 5, displayValue: '5' },
+                damage: { value: 1481, displayValue: '1,481' }
+              }
+            }
+          ]
+        }
+      };
+    case 'segments':
+      return {
+        data: {
+          segments: [
+            {
+              type: request.segmentType ?? 'legend',
+              metadata: { name: 'Lifeline', roleName: 'Support' },
+              stats: {
+                kills: { value: 1293, displayValue: '1,293' },
+                damage: { value: 1274677, displayValue: '1,274,677' },
+                wins: { value: 66, displayValue: '66' }
+              }
+            },
+            {
+              type: request.segmentType ?? 'legend',
+              metadata: { name: 'Horizon', roleName: 'Skirmisher' },
+              stats: {
+                kills: { value: 842, displayValue: '842' },
+                damage: { value: 618420, displayValue: '618,420' },
+                wins: { value: 32, displayValue: '32' }
+              }
+            }
+          ]
+        }
+      };
   }
 }
 
@@ -386,7 +631,7 @@ function errorResponse(
 ): Response {
   const body: StandardApiResponse<never> = {
     ok: false,
-    source: 'tracker',
+    source: meta.provider ?? 'tracker',
     cached: false,
     error: { code, message },
     meta
