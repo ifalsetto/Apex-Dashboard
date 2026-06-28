@@ -44,6 +44,14 @@ button {
   cursor: pointer;
 }
 
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+.tab-panel:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 3px;
+}
+
 .app-shell {
   position: relative;
   min-height: 100vh;
@@ -119,8 +127,7 @@ button {
 }
 
 .header {
-  position: sticky;
-  top: 0;
+  position: relative;
   z-index: 5;
   border-bottom: 1px solid var(--line);
   background: rgba(22, 8, 34, 0.85);
@@ -319,6 +326,101 @@ button {
   padding: 1rem;
   display: grid;
   gap: 1.15rem;
+}
+
+.tab-bar {
+  position: sticky;
+  top: 0;
+  z-index: 6;
+  padding: 0.7rem 1rem;
+  border-bottom: 1px solid rgba(212, 175, 55, 0.18);
+  background: rgba(18, 6, 29, 0.94);
+  backdrop-filter: blur(16px);
+}
+
+.tab-list {
+  display: flex;
+  gap: 0.55rem;
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(212, 175, 55, 0.55) rgba(31, 12, 48, 0.72);
+  padding-bottom: 0.15rem;
+}
+
+.tab-button {
+  min-width: 9.25rem;
+  flex: 0 0 auto;
+  border: 1px solid var(--line-soft);
+  border-radius: 1rem;
+  background: rgba(31, 12, 48, 0.78);
+  color: var(--muted);
+  padding: 0.7rem 0.85rem;
+  text-align: left;
+  transition: transform 160ms ease, border-color 160ms ease, background 160ms ease, color 160ms ease;
+}
+
+.tab-button:hover {
+  transform: translateY(-1px);
+  border-color: rgba(212, 175, 55, 0.32);
+  color: var(--text);
+}
+
+.tab-button.active {
+  color: var(--text);
+  border-color: rgba(212, 175, 55, 0.58);
+  background:
+    linear-gradient(135deg, rgba(212, 175, 55, 0.2), rgba(157, 78, 221, 0.18)),
+    rgba(31, 12, 48, 0.92);
+  box-shadow: 0 14px 26px rgba(0, 0, 0, 0.24), inset 0 0 0 1px rgba(248, 239, 255, 0.04);
+}
+
+.tab-button span {
+  display: block;
+  font-weight: 800;
+}
+
+.tab-button small {
+  display: block;
+  margin-top: 0.24rem;
+  font-size: 0.72rem;
+  line-height: 1.25;
+  color: var(--muted-strong);
+}
+
+.tab-panel {
+  display: grid;
+  gap: 1rem;
+  min-width: 0;
+}
+
+.status-banner {
+  display: grid;
+  gap: 0.3rem;
+  padding: 0.9rem 1rem;
+  border: 1px solid rgba(212, 175, 55, 0.35);
+  border-radius: 1rem;
+  background: rgba(212, 175, 55, 0.1);
+  color: #f7e8ad;
+  box-shadow: 0 14px 28px rgba(0, 0, 0, 0.22);
+}
+
+.status-banner strong {
+  color: var(--text);
+}
+
+.status-banner.warning {
+  border-color: rgba(212, 175, 55, 0.44);
+}
+
+.status-banner.error {
+  border-color: rgba(255, 142, 160, 0.45);
+  background: rgba(255, 142, 160, 0.1);
+  color: #ffd1d8;
+}
+
+.compact-actions {
+  margin-top: 0.75rem;
 }
 
 .panel {
@@ -755,8 +857,7 @@ button {
 @media (max-width: 720px) {
   .header,
   .main-content,
-  .section-body,
-  .section-toggle,
+  .tab-bar,
   .card,
   .stat-badge,
   .metric-tile {
@@ -774,6 +875,10 @@ button {
   .select,
   .input {
     width: 100%;
+  }
+
+  .tab-button {
+    min-width: 8.4rem;
   }
 }
 

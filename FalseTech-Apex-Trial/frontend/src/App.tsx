@@ -1,19 +1,19 @@
 ﻿import AuthPanel from "./AuthPanel";
-import { useEffect, useMemo, useReducer, useState } from 'react';
+import { useEffect, useReducer, useState } from 'react';
 
 type PlatformUi = 'steam' | 'xbl' | 'psn';
 type PlatformApi = 'origin' | 'xbl' | 'psn';
-type SectionKey =
-  | 'overview'
-  | 'live'
-  | 'music'
-  | 'friends'
-  | 'squads'
-  | 'creator'
+type TabKey =
   | 'command'
+  | 'live'
+  | 'friends'
   | 'legends'
   | 'weapons'
   | 'sessions'
+  | 'squads'
+  | 'music'
+  | 'creator'
+  | 'performance'
   | 'settings';
 
 type ProfileRecord = {
@@ -155,11 +155,26 @@ type TrackerSearchResponse = {
 const STORAGE = {
   handle: 'falsetech-active-handle-v1',
   platform: 'falsetech-active-platform-v1',
+  activeTab: 'falsetech-active-tab-v1',
   friends: 'falsetech-friends-v1',
   musicVisible: 'falsetech-music-visible-v1',
   spotifyEmbed: 'falsetech-spotify-embed-v1',
   creatorUnlocks: 'falsetech-creator-unlocks-v1'
 };
+
+const TABS: Array<{ key: TabKey; label: string; description: string }> = [
+  { key: 'command', label: 'Command', description: 'Summary cards and best next actions' },
+  { key: 'live', label: 'Live Data', description: 'Tracker proxy status and profile refresh controls' },
+  { key: 'friends', label: 'Friends', description: 'Saved handles and profile switching' },
+  { key: 'legends', label: 'Legends', description: 'Legend selection and fit details' },
+  { key: 'weapons', label: 'Weapons', description: 'Weapon selection and loadout fit' },
+  { key: 'sessions', label: 'Sessions', description: 'Session review and match notes' },
+  { key: 'squads', label: 'Squads', description: 'Squad structures and team roles' },
+  { key: 'music', label: 'Music', description: 'Creator music lane controls' },
+  { key: 'creator', label: 'Creator', description: 'Creator unlock and progress tools' },
+  { key: 'performance', label: 'Performance', description: 'FPS, latency, display, and network cards' },
+  { key: 'settings', label: 'Settings', description: 'Local settings and restore controls' }
+];
 
 const DEFAULT_PROFILE: ProfileRecord = {
   username: 'NotFalsetto',
@@ -348,20 +363,6 @@ const SQUADS = [
   }
 ];
 
-const DEFAULT_OPEN: Record<SectionKey, boolean> = {
-  overview: true,
-  live: true,
-  music: true,
-  friends: true,
-  squads: true,
-  creator: true,
-  command: true,
-  legends: true,
-  weapons: true,
-  sessions: true,
-  settings: true
-};
-
 const DEFAULT_STATE: DashboardState = {
   activeHandle: DEFAULT_PROFILE.username,
   platformUi: 'steam',
@@ -427,13 +428,53 @@ function formatNumber(value: number): string {
   return new Intl.NumberFormat().format(value);
 }
 
+class ApiRequestError extends Error {
+  status: number;
+  code?: string;
+
+  constructor(message: string, status: number, code?: string) {
+    super(message);
+    this.name = 'ApiRequestError';
+    this.status = status;
+    this.code = code;
+  }
+}
+
 async function fetchStandard<T>(url: string): Promise<StandardApiResponse<T>> {
   const response = await fetch(url);
-  const body = (await response.json()) as StandardApiResponse<T>;
-  if (!response.ok || !body.ok) {
-    throw new Error(body.error?.message ?? 'Request failed');
+  let body: StandardApiResponse<T> | null = null;
+
+  try {
+    body = (await response.json()) as StandardApiResponse<T>;
+  } catch {
+    body = null;
+  }
+
+  if (!response.ok || !body?.ok) {
+    throw new ApiRequestError(
+      body?.error?.message ?? 'Request failed',
+      response.status,
+      body?.error?.code
+    );
   }
   return body;
+}
+
+function liveFallbackMessage(error: unknown): string {
+  if (error instanceof ApiRequestError) {
+    if (error.status === 401 || error.status === 403 || error.code === 'UNAUTHORIZED' || error.code === 'FORBIDDEN') {
+      return 'Tracker API access is pending approval or denied. Using local beta preview data.';
+    }
+    if (error.status === 502 || error.code === 'TRACKER_PROXY_FAILURE') {
+      return 'Local backend reached the Worker, but Tracker upstream is unavailable. Using local beta preview data.';
+    }
+  }
+
+  return 'Live Tracker data is unavailable. Using local beta preview data.';
+}
+
+function isTabKey(value: string | null): value is TabKey {
+  return TABS.some((tab) => tab.key === value);
 }
 
 function pickOverviewSegment(profilePayload: TrackerProfileResponse) {
@@ -561,30 +602,54 @@ function AmbientStage() {
   );
 }
 
-function Section({
-  title,
-  description,
-  isOpen,
-  onToggle,
-  children
-}: {
-  title: string;
-  description: string;
-  isOpen: boolean;
-  onToggle: () => void;
-  children: React.ReactNode;
-}) {
+function TabBar({ activeTab, onSelect }: { activeTab: TabKey; onSelect: (tab: TabKey) => void }) {
   return (
-    <section className="panel">
-      <button className="section-toggle" onClick={onToggle}>
-        <div>
-          <div className="section-title">{title}</div>
-          <div className="section-description">{description}</div>
-        </div>
-        <div className={`section-chevron ${isOpen ? 'open' : ''}`}>v</div>
-      </button>
-      {isOpen ? <div className="section-body">{children}</div> : null}
+    <nav className="tab-bar" aria-label="Apex Dashboard v2 sections">
+      <div className="tab-list" role="tablist" aria-orientation="horizontal">
+        {TABS.map((tab) => (
+          <button
+            key={tab.key}
+            id={`tab-${tab.key}`}
+            data-tab={tab.key}
+            className={`tab-button ${activeTab === tab.key ? 'active' : ''}`}
+            type="button"
+            role="tab"
+            aria-selected={activeTab === tab.key}
+            aria-controls={`panel-${tab.key}`}
+            tabIndex={activeTab === tab.key ? 0 : -1}
+            onClick={() => onSelect(tab.key)}
+          >
+            <span>{tab.label}</span>
+            <small>{tab.description}</small>
+          </button>
+        ))}
+      </div>
+    </nav>
+  );
+}
+
+function TabPanel({ tabKey, activeTab, children }: { tabKey: TabKey; activeTab: TabKey; children: React.ReactNode }) {
+  if (activeTab !== tabKey) return null;
+
+  return (
+    <section
+      id={`panel-${tabKey}`}
+      className="tab-panel"
+      role="tabpanel"
+      aria-labelledby={`tab-${tabKey}`}
+      tabIndex={0}
+    >
+      {children}
     </section>
+  );
+}
+
+function StatusBanner({ message, tone = 'warning' }: { message: string; tone?: 'warning' | 'error' }) {
+  return (
+    <div className={`status-banner ${tone}`} role="status" aria-live="polite">
+      <strong>Live data status</strong>
+      <span>{message}</span>
+    </div>
   );
 }
 
@@ -650,7 +715,7 @@ function SessionSparkline({ sessions }: { sessions: SessionRecord[] }) {
 
 export default function App() {
   const [state, dispatch] = useReducer(reducer, DEFAULT_STATE);
-  const [sections, setSections] = useState(DEFAULT_OPEN);
+  const [activeTab, setActiveTab] = useState<TabKey>('command');
   const [searchValue, setSearchValue] = useState(DEFAULT_PROFILE.username);
   const [friends, setFriends] = useState<string[]>([]);
   const [selectedLegend, setSelectedLegend] = useState(DEFAULT_LEGENDS[0].id);
@@ -670,6 +735,7 @@ export default function App() {
   useEffect(() => {
     const savedHandle = localStorage.getItem(STORAGE.handle);
     const savedPlatform = localStorage.getItem(STORAGE.platform) as PlatformUi | null;
+    const savedActiveTab = localStorage.getItem(STORAGE.activeTab);
     const savedFriends = localStorage.getItem(STORAGE.friends);
     const savedMusicVisible = localStorage.getItem(STORAGE.musicVisible);
     const savedSpotifyEmbed = localStorage.getItem(STORAGE.spotifyEmbed);
@@ -682,6 +748,7 @@ export default function App() {
     if (savedPlatform === 'steam' || savedPlatform === 'xbl' || savedPlatform === 'psn') {
       dispatch({ type: 'SET_PLATFORM', platformUi: savedPlatform });
     }
+    if (isTabKey(savedActiveTab)) setActiveTab(savedActiveTab);
     if (savedFriends) {
       try {
         const parsed = JSON.parse(savedFriends);
@@ -712,6 +779,10 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem(STORAGE.platform, state.platformUi);
   }, [state.platformUi]);
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE.activeTab, activeTab);
+  }, [activeTab]);
 
   useEffect(() => {
     localStorage.setItem(STORAGE.friends, JSON.stringify(friends));
@@ -754,7 +825,7 @@ export default function App() {
         }
       });
     } catch (error) {
-      dispatch({ type: 'SYNC_ERROR', error: error instanceof Error ? error.message : 'Live refresh failed' });
+      dispatch({ type: 'SYNC_ERROR', error: liveFallbackMessage(error) });
     }
   };
 
@@ -778,20 +849,6 @@ export default function App() {
   const selectedWeaponRecord = state.weapons.find((item) => item.id === selectedWeapon) ?? state.weapons[0];
   const selectedSessionRecord = state.sessions.find((item) => item.id === selectedSession) ?? state.sessions[0];
 
-  const searchFilter = searchValue.trim().toLowerCase();
-  const filteredLegends = useMemo(
-    () => state.legends.filter((legend) => `${legend.name} ${legend.role}`.toLowerCase().includes(searchFilter || '')),
-    [state.legends, searchFilter]
-  );
-  const filteredWeapons = useMemo(
-    () => state.weapons.filter((weapon) => `${weapon.name} ${weapon.class} ${weapon.ammo}`.toLowerCase().includes(searchFilter || '')),
-    [state.weapons, searchFilter]
-  );
-  const filteredSessions = useMemo(
-    () => state.sessions.filter((session) => `${session.legend} ${session.map} ${session.summary}`.toLowerCase().includes(searchFilter || '')),
-    [state.sessions, searchFilter]
-  );
-
   const winRate = ((state.profile.totalWins / Math.max(1, state.profile.lifetimeMatches)) * 100).toFixed(1);
   const customLayoutsUnlocked = demoSubscribed && demoAddedSong;
   const extraLayoutSlots = customLayoutsUnlocked ? 1 + Number(demoSharedApp) + Number(demoSharedSpotify) : 0;
@@ -799,6 +856,7 @@ export default function App() {
   const handleAddFriend = () => {
     const trimmed = searchValue.trim();
     if (!trimmed) return;
+    setActiveTab('friends');
     if (friends.some((friend) => friend.toLowerCase() === trimmed.toLowerCase())) return;
     setFriends((current) => [trimmed, ...current]);
   };
@@ -808,6 +866,7 @@ export default function App() {
     if (!trimmed) return;
     setSearchValue(trimmed);
     dispatch({ type: 'SET_ACTIVE_HANDLE', handle: trimmed });
+    setActiveTab('live');
     void refreshLive(trimmed);
   };
 
@@ -815,8 +874,7 @@ export default function App() {
     setFriends((current) => current.filter((item) => item !== handle));
   };
 
-  const toggleSection = (key: SectionKey) => setSections((current) => ({ ...current, [key]: !current[key] }));
-  const setAllSections = (open: boolean) => setSections(Object.keys(DEFAULT_OPEN).reduce((acc, key) => ({ ...acc, [key]: open }), {} as Record<SectionKey, boolean>));
+  const apiStatusTone = state.syncError === 'Live Tracker data is unavailable. Using local beta preview data.' ? 'error' : 'warning';
 
   return (
     <div className="app-shell">
@@ -840,8 +898,6 @@ export default function App() {
             <button className="button button--gold" onClick={() => void refreshLive()} disabled={state.syncing}>
               {state.syncing ? 'Refreshing...' : 'Refresh Live'}
             </button>
-            <button className="button" onClick={() => setAllSections(true)}>Expand All</button>
-            <button className="button" onClick={() => setAllSections(false)}>Collapse All</button>
           </div>
         </div>
 
@@ -882,8 +938,10 @@ export default function App() {
         </div>
       </header>
 
+      <TabBar activeTab={activeTab} onSelect={setActiveTab} />
+
       <main className="main-content">
-        <Section title="Live Data Overview" description="The beta opens on a focused Apex command center with live profile context." isOpen={sections.overview} onToggle={() => toggleSection('overview')}>
+        <TabPanel tabKey="command" activeTab={activeTab}>
           <div className="grid grid--hero">
             <Card className="hero-card">
               <div className="pill-row">
@@ -913,12 +971,21 @@ export default function App() {
               <Card><strong>Active profile</strong><p>{state.activeHandle} | {platformLabel(state.platformUi)}</p></Card>
               <Card><strong>Dashboard mode</strong><p>FalseTech Apex Dashboard v2 Beta</p></Card>
               <Card><strong>Last live sync</strong><p>{state.lastSync ? new Date(state.lastSync).toLocaleString() : 'Waiting for first refresh'}</p></Card>
-              {state.syncError ? <Card><strong>Live status</strong><p>{state.syncError}</p></Card> : null}
+              {state.syncError ? <StatusBanner message={state.syncError} tone={apiStatusTone} /> : null}
+              <Card>
+                <strong>Best next actions</strong>
+                <div className="button-row compact-actions">
+                  <button className="button button--purple" onClick={() => setActiveTab('live')}>Check Live Data</button>
+                  <button className="button" onClick={() => setActiveTab('sessions')}>Review Sessions</button>
+                  <button className="button" onClick={() => setActiveTab('legends')}>Tune Legend Pick</button>
+                </div>
+              </Card>
             </div>
           </div>
-        </Section>
+        </TabPanel>
 
-        <Section title="Live Data" description="Open a profile, switch a friend, and refresh the board through the secure backend proxy." isOpen={sections.live} onToggle={() => toggleSection('live')}>
+        <TabPanel tabKey="live" activeTab={activeTab}>
+          {state.syncError ? <StatusBanner message={state.syncError} tone={apiStatusTone} /> : null}
           <div className="grid grid--split">
             <Card>
               <h3>Live source</h3>
@@ -945,9 +1012,9 @@ export default function App() {
               </div>
             </Card>
           </div>
-        </Section>
+        </TabPanel>
 
-        <Section title="Music" description="Creator music is available in the dashboard and can be hidden or restored from Settings." isOpen={sections.music} onToggle={() => toggleSection('music')}>
+        <TabPanel tabKey="music" activeTab={activeTab}>
           <div className="grid grid--split">
             <Card>
               <div className="card-header-inline">
@@ -996,9 +1063,9 @@ export default function App() {
               </div>
             </Card>
           </div>
-        </Section>
+        </TabPanel>
 
-        <Section title="Friends" description="Save player handles, switch profiles, and refresh live Apex stats without exposing keys in the frontend." isOpen={sections.friends} onToggle={() => toggleSection('friends')}>
+        <TabPanel tabKey="friends" activeTab={activeTab}>
           <div className="grid grid--split">
             <Card>
               <h3>Friend list</h3>
@@ -1030,9 +1097,9 @@ export default function App() {
               </div>
             </Card>
           </div>
-        </Section>
+        </TabPanel>
 
-        <Section title="Squads" description="Squads make the dashboard feel like a home base for teams, not just a stat pane for one player." isOpen={sections.squads} onToggle={() => toggleSection('squads')}>
+        <TabPanel tabKey="squads" activeTab={activeTab}>
           <div className="three-up-grid">
             {SQUADS.map((squad) => (
               <Card key={squad.name}>
@@ -1044,9 +1111,9 @@ export default function App() {
               </Card>
             ))}
           </div>
-        </Section>
+        </TabPanel>
 
-        <Section title="Creator Tools" description="Creator controls keep music, sharing, and saved layouts separate from live Apex data." isOpen={sections.creator} onToggle={() => toggleSection('creator')}>
+        <TabPanel tabKey="creator" activeTab={activeTab}>
           <div className="grid grid--split">
             <Card>
               <h3>Layout access model</h3>
@@ -1073,9 +1140,9 @@ export default function App() {
               </div>
             </Card>
           </div>
-        </Section>
+        </TabPanel>
 
-        <Section title="Performance" description="Local performance targets and network notes stay advisory and safe to run while Apex is open." isOpen={sections.command} onToggle={() => toggleSection('command')}>
+        <TabPanel tabKey="performance" activeTab={activeTab}>
           <div className="grid grid--split">
             <div className="three-up-grid compact-grid">
               <Card><MetricTile label="FPS Target" value={`${fpsTarget} FPS`} /></Card>
@@ -1099,16 +1166,19 @@ export default function App() {
               </div>
             </Card>
           </div>
-        </Section>
+        </TabPanel>
 
-        <Section title="Legends" description="Legend detail stays inside the same dashboard, with live profile context where available." isOpen={sections.legends} onToggle={() => toggleSection('legends')}>
+        <TabPanel tabKey="legends" activeTab={activeTab}>
           <div className="grid grid--split-wide">
             <div className="card-grid">
-              {filteredLegends.map((legend) => (
+              {state.legends.map((legend) => (
                 <button
                   key={legend.id}
                   className={`select-card ${selectedLegendRecord.id === legend.id ? 'selected' : ''}`}
-                  onClick={() => setSelectedLegend(legend.id)}
+                  onClick={() => {
+                    setSelectedLegend(legend.id);
+                    setActiveTab('legends');
+                  }}
                 >
                   <strong>{legend.name}</strong>
                   <span>{legend.role}</span>
@@ -1126,17 +1196,20 @@ export default function App() {
               </div>
             </Card>
           </div>
-        </Section>
+        </TabPanel>
 
-        <Section title="Weapons" description="Weapon intelligence stays profile-aware and visually active." isOpen={sections.weapons} onToggle={() => toggleSection('weapons')}>
+        <TabPanel tabKey="weapons" activeTab={activeTab}>
           <div className="grid grid--split-wide">
             <div className="stack-column">
               <div className="card-grid">
-                {filteredWeapons.map((weapon) => (
+                {state.weapons.map((weapon) => (
                   <button
                     key={weapon.id}
                     className={`select-card ${selectedWeaponRecord.id === weapon.id ? 'selected' : ''}`}
-                    onClick={() => setSelectedWeapon(weapon.id)}
+                    onClick={() => {
+                      setSelectedWeapon(weapon.id);
+                      setActiveTab('weapons');
+                    }}
                   >
                     <strong>{weapon.name}</strong>
                     <span>{weapon.class} | {weapon.ammo}</span>
@@ -1164,16 +1237,19 @@ export default function App() {
               </div>
             </Card>
           </div>
-        </Section>
+        </TabPanel>
 
-        <Section title="Session Review" description="Session history follows the active live profile and stays visually readable." isOpen={sections.sessions} onToggle={() => toggleSection('sessions')}>
+        <TabPanel tabKey="sessions" activeTab={activeTab}>
           <div className="grid grid--split-wide">
             <div className="stack-column">
-              {filteredSessions.map((session) => (
+              {state.sessions.map((session) => (
                 <button
                   key={session.id}
                   className={`session-card ${selectedSessionRecord.id === session.id ? 'selected' : ''}`}
-                  onClick={() => setSelectedSession(session.id)}
+                  onClick={() => {
+                    setSelectedSession(session.id);
+                    setActiveTab('sessions');
+                  }}
                 >
                   <div className="session-card__top">
                     <strong>{session.legend}</strong>
@@ -1204,15 +1280,20 @@ export default function App() {
               </div>
             </Card>
           </div>
-        </Section>
+        </TabPanel>
 
-        <Section title="Settings" description="Music restore, Spotify embed URL, and preview unlock controls live here." isOpen={sections.settings} onToggle={() => toggleSection('settings')}>
+        <TabPanel tabKey="settings" activeTab={activeTab}>
           <div className="grid grid--split">
             <Card>
               <h3>Music settings</h3>
               <div className="toggle-stack">
                 <Toggle label="Show default music player" checked={musicVisible} onToggle={() => setMusicVisible((current) => !current)} />
               </div>
+              {!musicVisible ? (
+                <button className="button button--gold" onClick={() => setMusicVisible(true)}>
+                  Restore Music
+                </button>
+              ) : null}
               <div className="input-stack">
                 <label className="input-label">Spotify embed URL</label>
                 <input
@@ -1222,6 +1303,14 @@ export default function App() {
                   placeholder="Paste Spotify embed URL here"
                 />
                 <div className="fine-print">Add your real Spotify embed URL here to make the music lane fully live for the preview.</div>
+              </div>
+            </Card>
+            <Card>
+              {state.syncError ? <StatusBanner message={state.syncError} tone={apiStatusTone} /> : null}
+              <div className="stack-column">
+                <Info title="Tracker API status" text="If approval is pending, 401 or 403 responses keep the local beta preview data visible instead of breaking the dashboard." />
+                <Info title="Backend upstream status" text="A 502 means the local backend reached the Worker, but Tracker upstream did not return usable data." />
+                <Info title="Fallback data" text="Default profile, legends, weapons, and sessions remain visible until live Tracker access succeeds." />
               </div>
             </Card>
             <Card>
@@ -1241,7 +1330,7 @@ export default function App() {
               </div>
             </Card>
           </div>
-        </Section>
+        </TabPanel>
       </main>
     </div>
   );

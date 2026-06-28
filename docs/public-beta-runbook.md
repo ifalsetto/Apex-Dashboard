@@ -28,14 +28,13 @@ dist
 Safe public frontend env values:
 
 ```text
-VITE_API_BASE_URL=https://falsetech-apex-tracker-proxy.falsetech-andrew.workers.dev
 VITE_AUTH0_DOMAIN=
 VITE_AUTH0_CLIENT_ID=
 VITE_AUTH0_REDIRECT_URI=
 VITE_AUTH0_LOGOUT_URI=
 ```
 
-Auth0 values are public application identifiers only. Do not put Tracker keys, Worker secrets, API tokens, or passwords in frontend env.
+Auth0 values are public application identifiers only. Do not put Tracker keys, Worker secrets, API tokens, passwords, or API base URLs in frontend env. Route `/api/*` at the hosting/proxy layer so the browser still calls relative `/api/apex/*` paths.
 
 ## Backend deployment
 
@@ -81,8 +80,8 @@ npx wrangler deploy
 1. User opens the public beta URL.
 2. User selects platform: Steam / EA, Xbox, or PlayStation.
 3. User searches their Apex profile handle.
-4. The frontend calls `/api/apex/*`.
-5. The Cloudflare Worker calls Tracker with `TRN_API_KEY`.
+4. The frontend calls relative `/api/apex/*` paths only.
+5. The Cloudflare Worker calls Tracker with `env.TRN_API_KEY`.
 6. The dashboard renders live stats, sessions, legends, weapons, friends, squads, music, creator tools, and settings.
 
 If an API call returns `FORBIDDEN`, treat it as Tracker key, account, or upstream access, not a frontend routing failure.

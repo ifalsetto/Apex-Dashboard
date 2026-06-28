@@ -65,7 +65,7 @@ Default local worker:
 
 Run the backend first, then the frontend.
 
-If needed during local testing, point frontend requests to the worker URL using a Vite proxy or deploy the worker and call that domain directly.
+The React app always calls relative `/api/apex` routes. In local development, Vite proxies `/api` to the local backend on `127.0.0.1:8787`; in Docker, nginx proxies `/api` to the backend service.
 
 ## Cloudflare deploy
 
