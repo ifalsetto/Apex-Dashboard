@@ -17,6 +17,8 @@ type TabKey =
   | 'performance'
   | 'settings';
 
+const WORKER_API_BASE_URL = 'https://falsetech-apex-tracker-proxy.falsetech-andrew.workers.dev';
+
 type ProfileRecord = {
   username: string;
   platform: string;
@@ -461,8 +463,16 @@ class ApiRequestError extends Error {
   }
 }
 
+function apiUrl(path: string): string {
+  const cleanPath = path.startsWith('/') ? path : `/${path}`;
+  const configuredBase = import.meta.env.VITE_API_BASE_URL?.trim();
+  const baseUrl = configuredBase || (import.meta.env.DEV ? '' : WORKER_API_BASE_URL);
+
+  return baseUrl ? `${baseUrl.replace(/\/+$/, '')}${cleanPath}` : cleanPath;
+}
+
 async function fetchStandard<T>(url: string): Promise<StandardApiResponse<T>> {
-  const response = await fetch(url, {
+  const response = await fetch(apiUrl(url), {
     method: 'GET',
     headers: {
       Accept: 'application/json'

@@ -90,7 +90,7 @@ Required routes:
 
 ## Data and safety boundaries
 
-Frontend calls use `/api` only. Tracker credentials stay server-side in the Worker.
+Frontend calls use backend/proxy `/api` routes only. In local dev that is the relative Vite `/api` proxy. In production static builds it defaults to the public Cloudflare Worker, or to `VITE_API_BASE_URL` when that value is set to a safe backend/proxy base URL. Tracker credentials stay server-side in the Worker.
 
 Allowed data:
 
