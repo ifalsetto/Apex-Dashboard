@@ -1,4 +1,5 @@
 ﻿import AuthPanel from "./AuthPanel";
+import { SpotifyMusicPanel } from './components/SpotifyMusicPanel';
 import { useEffect, useReducer, useState } from 'react';
 
 type PlatformUi = 'steam' | 'xbl' | 'psn';
@@ -188,6 +189,7 @@ const STORAGE = {
   platform: 'falsetech-active-platform-v1',
   activeTab: 'falsetech-active-tab-v1',
   friends: 'falsetech-friends-v1',
+  musicEnabled: 'falsetech-music-enabled-v1',
   musicVisible: 'falsetech-music-visible-v1',
   spotifyEmbed: 'falsetech-spotify-embed-v1',
   creatorUnlocks: 'falsetech-creator-unlocks-v1'
@@ -796,9 +798,9 @@ export default function App() {
   const [selectedLegend, setSelectedLegend] = useState(DEFAULT_LEGENDS[0].id);
   const [selectedWeapon, setSelectedWeapon] = useState(DEFAULT_WEAPONS[0].id);
   const [selectedSession, setSelectedSession] = useState(DEFAULT_SESSIONS[0].id);
+  const [musicEnabled, setMusicEnabled] = useState(true);
   const [musicVisible, setMusicVisible] = useState(true);
   const [spotifyEmbedUrl, setSpotifyEmbedUrl] = useState('');
-  const safeSpotifyEmbedUrl = sanitizeSpotifyEmbedUrl(spotifyEmbedUrl);
   const [demoSubscribed, setDemoSubscribed] = useState(false);
   const [demoAddedSong, setDemoAddedSong] = useState(false);
   const [demoSharedApp, setDemoSharedApp] = useState(false);
@@ -812,6 +814,7 @@ export default function App() {
     const savedPlatform = localStorage.getItem(STORAGE.platform) as PlatformUi | null;
     const savedActiveTab = localStorage.getItem(STORAGE.activeTab);
     const savedFriends = localStorage.getItem(STORAGE.friends);
+    const savedMusicEnabled = localStorage.getItem(STORAGE.musicEnabled);
     const savedMusicVisible = localStorage.getItem(STORAGE.musicVisible);
     const savedSpotifyEmbed = localStorage.getItem(STORAGE.spotifyEmbed);
     const savedUnlocks = localStorage.getItem(STORAGE.creatorUnlocks);
@@ -832,6 +835,7 @@ export default function App() {
         // ignore
       }
     }
+    if (savedMusicEnabled) setMusicEnabled(savedMusicEnabled === 'true');
     if (savedMusicVisible) setMusicVisible(savedMusicVisible === 'true');
     if (savedSpotifyEmbed) setSpotifyEmbedUrl(savedSpotifyEmbed);
     if (savedUnlocks) {
@@ -862,6 +866,10 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem(STORAGE.friends, JSON.stringify(friends));
   }, [friends]);
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE.musicEnabled, String(musicEnabled));
+  }, [musicEnabled]);
 
   useEffect(() => {
     localStorage.setItem(STORAGE.musicVisible, String(musicVisible));
@@ -1096,49 +1104,21 @@ export default function App() {
         <TabPanel tabKey="music" activeTab={activeTab}>
           <div className="grid grid--split">
             <Card>
-              <div className="card-header-inline">
-                <div>
-                  <h3>Creator music player</h3>
-                  <p className="muted-copy">Keep the player visible for creator sessions, or hide it from this card and restore it in Settings.</p>
-                </div>
-                {musicVisible ? <button className="button" onClick={() => setMusicVisible(false)}>Hide Player</button> : null}
-              </div>
-              {musicVisible ? (
-                safeSpotifyEmbedUrl ? (
-                  <div className="spotify-wrap">
-                    <iframe
-                      title="FalseTech Spotify Player"
-                      src={safeSpotifyEmbedUrl}
-                      width="100%"
-                      height="352"
-                      allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
-                      loading="lazy"
-                    />
-                  </div>
-                ) : (
-                  <div className="music-empty-state">
-                    <h4>Spotify embed lane ready</h4>
-                    <p>
-                      Add a Spotify embed URL in Settings to turn this lane into a live creator player.
-                    </p>
-                    <div className="pill-row">
-                      <Pill>Music</Pill>
-                      <Pill>Restore in Settings</Pill>
-                    </div>
-                  </div>
-                )
-              ) : (
-                <div className="music-empty-state muted-state">
-                  Music player hidden. Go to <strong>Settings</strong> to re-enable it.
-                </div>
-              )}
+              <SpotifyMusicPanel
+                spotifyUrl={spotifyEmbedUrl}
+                enabled={musicEnabled}
+                visible={musicVisible}
+                onEnabledChange={setMusicEnabled}
+                onVisibleChange={setMusicVisible}
+                onSave={setSpotifyEmbedUrl}
+              />
             </Card>
             <Card>
               <h3>Music behavior</h3>
               <div className="stack-column">
-                <Info title="Music" text="The music player supports the creator lane without requiring any Apex game integration." />
-                <Info title="Hide" text="A user can hide the player directly from the music card without leaving the dashboard." />
-                <Info title="Restore" text="To bring it back, the user goes into Settings and turns the music lane back on." />
+                <Info title="No OAuth" text="Public Spotify embeds only." />
+                <Info title="No keys" text="No Spotify API key is needed." />
+                <Info title="Control" text="Hide, show, or disable anytime." />
               </div>
             </Card>
           </div>
@@ -1364,25 +1344,15 @@ export default function App() {
         <TabPanel tabKey="settings" activeTab={activeTab}>
           <div className="grid grid--split">
             <Card>
-              <h3>Music settings</h3>
-              <div className="toggle-stack">
-                <Toggle label="Show default music player" checked={musicVisible} onToggle={() => setMusicVisible((current) => !current)} />
-              </div>
-              {!musicVisible ? (
-                <button className="button button--gold" onClick={() => setMusicVisible(true)}>
-                  Restore Music
-                </button>
-              ) : null}
-              <div className="input-stack">
-                <label className="input-label">Spotify embed URL</label>
-                <input
-                  className="input"
-                  value={spotifyEmbedUrl}
-                  onChange={(event) => setSpotifyEmbedUrl(event.target.value)}
-                  placeholder="Paste Spotify embed URL here"
-                />
-                <div className="fine-print">Add your real Spotify embed URL here to make the music lane fully live for the preview.</div>
-              </div>
+              <SpotifyMusicPanel
+                spotifyUrl={spotifyEmbedUrl}
+                enabled={musicEnabled}
+                visible={musicVisible}
+                mode="settings"
+                onEnabledChange={setMusicEnabled}
+                onVisibleChange={setMusicVisible}
+                onSave={setSpotifyEmbedUrl}
+              />
             </Card>
             <Card>
               {state.syncError ? <StatusBanner message={state.syncError} tone={apiStatusTone} /> : null}
@@ -1413,27 +1383,6 @@ export default function App() {
       </main>
     </div>
   );
-}
-
-function sanitizeSpotifyEmbedUrl(value: string): string {
-  if (!value) {
-    return '';
-  }
-
-  try {
-    const parsed = new URL(value);
-    const isHttps = parsed.protocol === 'https:';
-    const isSpotifyHost = parsed.hostname === 'open.spotify.com';
-    const isEmbedPath = parsed.pathname.startsWith('/embed/');
-
-    if (isHttps && isSpotifyHost && isEmbedPath) {
-      return parsed.toString();
-    }
-  } catch {
-    return '';
-  }
-
-  return '';
 }
 
 function Info({ title, text }: { title: string; text: string }) {
