@@ -750,13 +750,11 @@ select:focus-visible,
 }
 
 .spotify-wrap--compact {
-  border-radius: 16px;
   border-color: rgba(212, 175, 55, 0.28);
 }
 
 .spotify-wrap iframe {
   border: 0;
-  display: block;
 }
 
 .card-header-inline {
