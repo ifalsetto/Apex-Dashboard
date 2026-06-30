@@ -419,12 +419,20 @@ async function fetchProviderData(env: Env, request: ProviderRequest): Promise<Pr
       const data = await provider.fetch(env, request);
       attempts.push({ provider: provider.id, status: 'hit' });
       const runtime = runtimeStatusFor(provider.id, attempts);
+      if (runtime.fallbackUsed) {
+        attempts[attempts.length - 1] = {
+          provider: provider.id,
+          status: 'hit',
+          code: 'FALLBACK_USED',
+          message: 'Using local beta preview data'
+        };
+      }
       return { provider: provider.id, data, attempts, ...runtime };
     } catch (error) {
       const providerError = normalizeProviderError(provider.id, error);
       attempts.push({
         provider: provider.id,
-        status: providerError.terminal ? 'blocked' : 'failed',
+        status: providerAttemptStatus(providerError),
         code: providerError.code,
         message: providerError.message
       });
@@ -445,6 +453,11 @@ function normalizeProviderError(provider: ProviderId, error: unknown): ProviderH
     return new ProviderHttpError(provider, 502, 'PROVIDER_FAILURE', 'Provider failure');
   }
   return new ProviderHttpError(provider, 502, 'PROVIDER_FAILURE', 'Provider failure');
+}
+
+function providerAttemptStatus(error: ProviderHttpError): ProviderAttemptStatus {
+  if (error.code === 'UNAUTHORIZED' || error.code === 'FORBIDDEN') return 'blocked';
+  return error.terminal ? 'blocked' : 'failed';
 }
 
 function runtimeStatusFor(provider: ProviderId, attempts: ProviderAttempt[]): Pick<ProviderResult, 'fallbackUsed' | 'status' | 'message'> {
@@ -554,15 +567,15 @@ function mapUpstreamError(provider: ProviderId, status: number): ProviderHttpErr
     case 400:
       return new ProviderHttpError(provider, 400, 'BAD_REQUEST', 'Bad request to Tracker', true);
     case 401:
-      return new ProviderHttpError(provider, 401, 'UNAUTHORIZED', TRACKER_AUTH_FALLBACK_MESSAGE);
+      return new ProviderHttpError(provider, 401, 'UNAUTHORIZED', 'Unauthorized upstream request');
     case 403:
-      return new ProviderHttpError(provider, 403, 'FORBIDDEN', TRACKER_AUTH_FALLBACK_MESSAGE);
+      return new ProviderHttpError(provider, 403, 'FORBIDDEN', 'Forbidden upstream request');
     case 404:
       return new ProviderHttpError(provider, 404, 'PLAYER_NOT_FOUND', 'Player not found', true);
     case 429:
       return new ProviderHttpError(provider, 429, 'RATE_LIMITED', 'Tracker rate limit reached');
     default:
-      return new ProviderHttpError(provider, 502, 'TRACKER_UPSTREAM_UNAVAILABLE', TRACKER_UPSTREAM_FALLBACK_MESSAGE);
+      return new ProviderHttpError(provider, 502, 'TRACKER_UPSTREAM_UNAVAILABLE', 'Tracker upstream is unavailable');
   }
 }
 
