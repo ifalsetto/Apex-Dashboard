@@ -109,6 +109,7 @@ type DashboardAction =
         profile: ProfileRecord;
         legends: LegendRecord[];
         sessions: SessionRecord[];
+        statusMessage?: string | null;
       };
     }
   | { type: 'SYNC_ERROR'; error: string };
@@ -116,7 +117,11 @@ type DashboardAction =
 type StandardApiResponse<T> = {
   ok: boolean;
   source: ProviderId;
+  provider?: ProviderId;
+  fallbackUsed: boolean;
   cached: boolean;
+  status: 'live' | 'fallback' | 'error';
+  message: string;
   data?: T;
   error?: { code: string; message: string };
   meta: {
@@ -127,6 +132,9 @@ type StandardApiResponse<T> = {
     segmentType?: string;
     fetchedAt?: string;
     provider?: ProviderId;
+    fallbackUsed?: boolean;
+    status?: 'live' | 'fallback' | 'error';
+    message?: string;
     providerChain?: Array<{
       provider: ProviderId;
       status: 'hit' | 'failed' | 'skipped' | 'blocked';
@@ -411,7 +419,7 @@ function reducer(state: DashboardState, action: DashboardAction): DashboardState
       return {
         ...state,
         syncing: false,
-        syncError: null,
+        syncError: action.payload.statusMessage ?? null,
         lastSync: new Date().toISOString(),
         profile: action.payload.profile,
         legends: action.payload.legends,
@@ -501,12 +509,41 @@ function liveFallbackMessage(error: unknown): string {
     if (error.status === 401 || error.status === 403 || error.code === 'UNAUTHORIZED' || error.code === 'FORBIDDEN') {
       return 'Tracker API access is pending approval or denied. Using local beta preview data.';
     }
-    if (error.status === 502 || error.code === 'TRACKER_PROXY_FAILURE') {
+    if (
+      error.status === 502 ||
+      error.code === 'TRACKER_PROXY_FAILURE' ||
+      error.code === 'TRACKER_UPSTREAM_UNAVAILABLE' ||
+      error.code === 'TRACKER_TIMEOUT' ||
+      error.code === 'PROVIDER_FAILURE'
+    ) {
       return 'Local backend reached the Worker, but Tracker upstream is unavailable. Using local beta preview data.';
     }
   }
 
   return 'Live Tracker data is unavailable. Using local beta preview data.';
+}
+
+function providerStatusMessage(...responses: Array<StandardApiResponse<unknown>>): string | null {
+  const fallbackResponses = responses.filter((response) => response.fallbackUsed || response.status === 'fallback');
+  if (!fallbackResponses.length) return null;
+
+  const authFallback = fallbackResponses.find((response) =>
+    response.meta.providerChain?.some((attempt) => attempt.code === 'UNAUTHORIZED' || attempt.code === 'FORBIDDEN')
+  );
+  if (authFallback) {
+    return 'Tracker API access is pending approval or denied. Using local beta preview data.';
+  }
+
+  const upstreamFallback = fallbackResponses.find((response) =>
+    response.meta.providerChain?.some((attempt) =>
+      ['TRACKER_UPSTREAM_UNAVAILABLE', 'TRACKER_TIMEOUT', 'TRACKER_PROXY_FAILURE', 'PROVIDER_FAILURE'].includes(attempt.code ?? '')
+    )
+  );
+  if (upstreamFallback) {
+    return 'Local backend reached the Worker, but Tracker upstream is unavailable. Using local beta preview data.';
+  }
+
+  return fallbackResponses[0].message || fallbackResponses[0].meta.message || 'Live Tracker data is unavailable. Using local beta preview data.';
 }
 
 function isTabKey(value: string | null): value is TabKey {
@@ -862,7 +899,8 @@ export default function App() {
         payload: {
           profile: normalizeProfile(profileRes.data ?? {}, state.platformUi, canonicalHandle),
           legends: normalizeLegendSegments(legendRes.data),
-          sessions: normalizeSessions(sessionsRes.data)
+          sessions: normalizeSessions(sessionsRes.data),
+          statusMessage: providerStatusMessage(searchRes, profileRes, sessionsRes, legendRes)
         }
       });
     } catch (error) {

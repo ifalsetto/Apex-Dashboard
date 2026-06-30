@@ -7,6 +7,7 @@ type PlatformKey = 'origin' | 'xbl' | 'psn';
 type CacheBucket = 'search' | 'profile' | 'sessions' | 'segments';
 type ProviderId = 'tracker' | 'mozambique' | 'mock';
 type ProviderAttemptStatus = 'hit' | 'failed' | 'skipped' | 'blocked';
+type RuntimeStatus = 'live' | 'fallback' | 'error';
 
 type ProviderAttempt = {
   provider: ProviderId;
@@ -18,7 +19,11 @@ type ProviderAttempt = {
 type StandardApiResponse<T> = {
   ok: boolean;
   source: ProviderId;
+  provider?: ProviderId;
+  fallbackUsed: boolean;
   cached: boolean;
+  status: RuntimeStatus;
+  message: string;
   data?: T;
   error?: {
     code: string;
@@ -32,11 +37,17 @@ type StandardApiResponse<T> = {
     segmentType?: string;
     fetchedAt: string;
     provider?: ProviderId;
+    fallbackUsed?: boolean;
+    status?: RuntimeStatus;
+    message?: string;
     providerChain?: ProviderAttempt[];
   };
 };
 
 const TRACKER_API_BASE = 'https://public-api.tracker.gg/v2/apex/standard';
+const TRACKER_TIMEOUT_MS = 6500;
+const TRACKER_AUTH_FALLBACK_MESSAGE = 'Tracker API access is pending approval or denied. Using local beta preview data.';
+const TRACKER_UPSTREAM_FALLBACK_MESSAGE = 'Local backend reached the Worker, but Tracker upstream is unavailable. Using local beta preview data.';
 const VALID_PLATFORMS = new Set<PlatformKey>(['origin', 'xbl', 'psn']);
 const HANDLE_PATTERN = /^[A-Za-z0-9 _\-.\[\]\(\)~]{1,64}$/;
 const SEGMENT_PATTERN = /^[a-z0-9_-]{1,32}$/i;
@@ -67,7 +78,11 @@ export default {
       return jsonResponse(request, env, 200, {
         ok: true,
         source: 'tracker',
+        provider: 'tracker',
+        fallbackUsed: false,
         cached: false,
+        status: 'live',
+        message: 'Apex Dashboard Worker is healthy.',
         data: {
           service: 'falsetech-apex-tracker-proxy',
           trackerConfigured: Boolean(env.TRN_API_KEY),
@@ -246,7 +261,7 @@ async function providerRoute(args: ProviderRouteArgs): Promise<Response> {
 
   if (cached) {
     const body = (await cached.clone().json()) as StandardApiResponse<unknown>;
-    body.cached = true;
+    normalizeCachedBody(body);
     return jsonResponse(request, env, 200, body, {
       'Cache-Control': `public, max-age=${CACHE_TTL[cacheBucket]}`,
       'X-Proxy-Cache': 'HIT'
@@ -258,11 +273,18 @@ async function providerRoute(args: ProviderRouteArgs): Promise<Response> {
     const payload: StandardApiResponse<unknown> = {
       ok: true,
       source: providerResult.provider,
+      provider: providerResult.provider,
+      fallbackUsed: providerResult.fallbackUsed,
       cached: false,
+      status: providerResult.status,
+      message: providerResult.message,
       data: providerResult.data,
       meta: {
         ...meta,
         provider: providerResult.provider,
+        fallbackUsed: providerResult.fallbackUsed,
+        status: providerResult.status,
+        message: providerResult.message,
         providerChain: providerResult.attempts
       }
     };
@@ -297,6 +319,9 @@ type ProviderResult = {
   provider: ProviderId;
   data: unknown;
   attempts: ProviderAttempt[];
+  fallbackUsed: boolean;
+  status: RuntimeStatus;
+  message: string;
 };
 
 type ApexDataProvider = {
@@ -393,7 +418,8 @@ async function fetchProviderData(env: Env, request: ProviderRequest): Promise<Pr
     try {
       const data = await provider.fetch(env, request);
       attempts.push({ provider: provider.id, status: 'hit' });
-      return { provider: provider.id, data, attempts };
+      const runtime = runtimeStatusFor(provider.id, attempts);
+      return { provider: provider.id, data, attempts, ...runtime };
     } catch (error) {
       const providerError = normalizeProviderError(provider.id, error);
       attempts.push({
@@ -416,9 +442,64 @@ async function fetchProviderData(env: Env, request: ProviderRequest): Promise<Pr
 function normalizeProviderError(provider: ProviderId, error: unknown): ProviderHttpError {
   if (error instanceof ProviderHttpError) return error;
   if (error instanceof Error) {
-    return new ProviderHttpError(provider, 502, 'PROVIDER_FAILURE', error.message);
+    return new ProviderHttpError(provider, 502, 'PROVIDER_FAILURE', 'Provider failure');
   }
   return new ProviderHttpError(provider, 502, 'PROVIDER_FAILURE', 'Provider failure');
+}
+
+function runtimeStatusFor(provider: ProviderId, attempts: ProviderAttempt[]): Pick<ProviderResult, 'fallbackUsed' | 'status' | 'message'> {
+  const fallbackUsed = provider !== 'tracker' || attempts.some((attempt) => attempt.provider === 'tracker' && attempt.status !== 'hit');
+  if (!fallbackUsed) {
+    return {
+      fallbackUsed: false,
+      status: 'live',
+      message: 'Live Tracker data loaded.'
+    };
+  }
+
+  const trackerAttempt = attempts.find((attempt) => attempt.provider === 'tracker' && attempt.status !== 'hit');
+  if (trackerAttempt?.code === 'UNAUTHORIZED' || trackerAttempt?.code === 'FORBIDDEN') {
+    return {
+      fallbackUsed: true,
+      status: 'fallback',
+      message: TRACKER_AUTH_FALLBACK_MESSAGE
+    };
+  }
+
+  if (
+    trackerAttempt?.code === 'TRACKER_UPSTREAM_UNAVAILABLE' ||
+    trackerAttempt?.code === 'TRACKER_TIMEOUT' ||
+    trackerAttempt?.code === 'TRACKER_PROXY_FAILURE' ||
+    trackerAttempt?.code === 'PROVIDER_FAILURE'
+  ) {
+    return {
+      fallbackUsed: true,
+      status: 'fallback',
+      message: TRACKER_UPSTREAM_FALLBACK_MESSAGE
+    };
+  }
+
+  if (trackerAttempt?.code === 'RATE_LIMITED') {
+    return {
+      fallbackUsed: true,
+      status: 'fallback',
+      message: 'Tracker rate limit reached. Using local beta preview data.'
+    };
+  }
+
+  if (trackerAttempt?.status === 'skipped' || trackerAttempt?.code === 'PROVIDER_NOT_CONFIGURED') {
+    return {
+      fallbackUsed: true,
+      status: 'fallback',
+      message: 'Tracker integration is not configured. Using local beta preview data.'
+    };
+  }
+
+  return {
+    fallbackUsed: true,
+    status: 'fallback',
+    message: 'Live Tracker data is unavailable. Using local beta preview data.'
+  };
 }
 
 function providerStatus(env: Env) {
@@ -431,17 +512,31 @@ function providerStatus(env: Env) {
 }
 
 async function fetchTracker(url: string, apiKey: string): Promise<unknown> {
-  const response = await fetch(url, {
-    headers: {
-      Accept: 'application/json',
-      'TRN-Api-Key': apiKey,
-      'User-Agent': 'FalseTech-Apex-Proxy/1.0'
-    },
-    cf: {
-      cacheEverything: false,
-      cacheTtl: 30
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), TRACKER_TIMEOUT_MS);
+  let response: Response;
+
+  try {
+    response = await fetch(url, {
+      headers: {
+        Accept: 'application/json',
+        'TRN-Api-Key': apiKey,
+        'User-Agent': 'FalseTech-Apex-Proxy/1.0'
+      },
+      signal: controller.signal,
+      cf: {
+        cacheEverything: false,
+        cacheTtl: 30
+      }
+    });
+  } catch (error) {
+    if (isAbortError(error)) {
+      throw new ProviderHttpError('tracker', 502, 'TRACKER_TIMEOUT', 'Tracker request timed out');
     }
-  });
+    throw new ProviderHttpError('tracker', 502, 'TRACKER_UPSTREAM_UNAVAILABLE', 'Tracker upstream is unavailable');
+  } finally {
+    clearTimeout(timeoutId);
+  }
 
   if (!response.ok) {
     throw mapUpstreamError('tracker', response.status);
@@ -450,21 +545,40 @@ async function fetchTracker(url: string, apiKey: string): Promise<unknown> {
   return response.json();
 }
 
+function isAbortError(error: unknown): boolean {
+  return error instanceof DOMException ? error.name === 'AbortError' : error instanceof Error && error.name === 'AbortError';
+}
+
 function mapUpstreamError(provider: ProviderId, status: number): ProviderHttpError {
   switch (status) {
     case 400:
       return new ProviderHttpError(provider, 400, 'BAD_REQUEST', 'Bad request to Tracker', true);
     case 401:
-      return new ProviderHttpError(provider, 401, 'UNAUTHORIZED', 'Unauthorized upstream request', true);
+      return new ProviderHttpError(provider, 401, 'UNAUTHORIZED', TRACKER_AUTH_FALLBACK_MESSAGE);
     case 403:
-      return new ProviderHttpError(provider, 403, 'FORBIDDEN', 'Tracker access forbidden', true);
+      return new ProviderHttpError(provider, 403, 'FORBIDDEN', TRACKER_AUTH_FALLBACK_MESSAGE);
     case 404:
       return new ProviderHttpError(provider, 404, 'PLAYER_NOT_FOUND', 'Player not found', true);
     case 429:
       return new ProviderHttpError(provider, 429, 'RATE_LIMITED', 'Tracker rate limit reached');
     default:
-      return new ProviderHttpError(provider, 502, 'TRACKER_PROXY_FAILURE', 'Tracker proxy failure');
+      return new ProviderHttpError(provider, 502, 'TRACKER_UPSTREAM_UNAVAILABLE', TRACKER_UPSTREAM_FALLBACK_MESSAGE);
   }
+}
+
+function normalizeCachedBody(body: StandardApiResponse<unknown>): void {
+  body.cached = true;
+  body.provider ??= body.meta.provider ?? body.source;
+  body.fallbackUsed ??= body.meta.fallbackUsed ?? body.provider !== 'tracker';
+  body.status ??= body.meta.status ?? (body.fallbackUsed ? 'fallback' : 'live');
+  body.message ??= body.meta.message ?? (body.fallbackUsed ? 'Live Tracker data is unavailable. Using local beta preview data.' : 'Live Tracker data loaded.');
+  body.meta = {
+    ...body.meta,
+    provider: body.provider,
+    fallbackUsed: body.fallbackUsed,
+    status: body.status,
+    message: body.message
+  };
 }
 
 function mockProviderData(request: ProviderRequest): unknown {
@@ -632,9 +746,18 @@ function errorResponse(
   const body: StandardApiResponse<never> = {
     ok: false,
     source: meta.provider ?? 'tracker',
+    provider: meta.provider ?? 'tracker',
+    fallbackUsed: false,
     cached: false,
+    status: 'error',
+    message,
     error: { code, message },
-    meta
+    meta: {
+      ...meta,
+      fallbackUsed: false,
+      status: 'error',
+      message
+    }
   };
 
   return jsonResponse(request, env, status, body, {
