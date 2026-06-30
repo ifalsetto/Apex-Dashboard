@@ -19,6 +19,7 @@ type TabKey =
   | 'settings';
 
 const WORKER_API_BASE_URL = 'https://falsetech-apex-tracker-proxy.falsetech-andrew.workers.dev';
+const DEFAULT_SPOTIFY_EMBED_URL = 'https://open.spotify.com/embed/artist/3Z9dPu2wQ7angZt7yzqGDP';
 
 type ProfileRecord = {
   username: string;
@@ -800,7 +801,7 @@ export default function App() {
   const [selectedSession, setSelectedSession] = useState(DEFAULT_SESSIONS[0].id);
   const [musicEnabled, setMusicEnabled] = useState(true);
   const [musicVisible, setMusicVisible] = useState(true);
-  const [spotifyEmbedUrl, setSpotifyEmbedUrl] = useState('');
+  const [spotifyEmbedUrl, setSpotifyEmbedUrl] = useState(DEFAULT_SPOTIFY_EMBED_URL);
   const [demoSubscribed, setDemoSubscribed] = useState(false);
   const [demoAddedSong, setDemoAddedSong] = useState(false);
   const [demoSharedApp, setDemoSharedApp] = useState(false);
@@ -837,7 +838,7 @@ export default function App() {
     }
     if (savedMusicEnabled) setMusicEnabled(savedMusicEnabled === 'true');
     if (savedMusicVisible) setMusicVisible(savedMusicVisible === 'true');
-    if (savedSpotifyEmbed) setSpotifyEmbedUrl(savedSpotifyEmbed);
+    if (savedSpotifyEmbed !== null) setSpotifyEmbedUrl(savedSpotifyEmbed);
     if (savedUnlocks) {
       try {
         const parsed = JSON.parse(savedUnlocks);

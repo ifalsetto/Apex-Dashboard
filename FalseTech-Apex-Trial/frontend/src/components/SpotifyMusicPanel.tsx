@@ -61,16 +61,6 @@ export function spotifyOpenUrlFromEmbed(embedUrl: string): string {
   return embedUrl.replace('https://open.spotify.com/embed/', 'https://open.spotify.com/');
 }
 
-function spotifyTypeFromEmbed(embedUrl: string): string {
-  try {
-    const parsed = new URL(embedUrl);
-    const [, spotifyType] = parsed.pathname.split('/').filter(Boolean);
-    return spotifyType && SPOTIFY_TYPES.has(spotifyType) ? spotifyType : 'embed';
-  } catch {
-    return 'embed';
-  }
-}
-
 export function SpotifyMusicPanel({
   spotifyUrl,
   enabled,
@@ -90,8 +80,7 @@ export function SpotifyMusicPanel({
   const embedUrl = useMemo(() => normalizeSpotifyEmbedUrl(spotifyUrl), [spotifyUrl]);
   const draftEmbedUrl = useMemo(() => normalizeSpotifyEmbedUrl(draftUrl), [draftUrl]);
   const openUrl = spotifyOpenUrlFromEmbed(embedUrl);
-  const spotifyType = spotifyTypeFromEmbed(embedUrl);
-  const iframeHeight = spotifyType === 'track' ? 152 : 352;
+  const iframeHeight = 152;
   const hasDraft = Boolean(draftUrl.trim());
   const canSave = !hasDraft || Boolean(draftEmbedUrl);
 
