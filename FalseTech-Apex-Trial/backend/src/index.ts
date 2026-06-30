@@ -570,12 +570,16 @@ function mapUpstreamError(provider: ProviderId, status: number): ProviderHttpErr
       return new ProviderHttpError(provider, 401, 'UNAUTHORIZED', 'Unauthorized upstream request');
     case 403:
       return new ProviderHttpError(provider, 403, 'FORBIDDEN', 'Forbidden upstream request');
+      return new ProviderHttpError(provider, 401, 'UNAUTHORIZED', TRACKER_AUTH_FALLBACK_MESSAGE);
+    case 403:
+      return new ProviderHttpError(provider, 403, 'FORBIDDEN', TRACKER_AUTH_FALLBACK_MESSAGE);
     case 404:
       return new ProviderHttpError(provider, 404, 'PLAYER_NOT_FOUND', 'Player not found', true);
     case 429:
       return new ProviderHttpError(provider, 429, 'RATE_LIMITED', 'Tracker rate limit reached');
     default:
       return new ProviderHttpError(provider, 502, 'TRACKER_UPSTREAM_UNAVAILABLE', 'Tracker upstream is unavailable');
+      return new ProviderHttpError(provider, 502, 'TRACKER_UPSTREAM_UNAVAILABLE', TRACKER_UPSTREAM_FALLBACK_MESSAGE);
   }
 }
 
