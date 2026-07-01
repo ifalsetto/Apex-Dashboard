@@ -157,8 +157,12 @@ Provider priority:
 
 Provider layer status:
 
-- Tracker provider behavior exists through the current Worker proxy route construction.
-- The full provider layer abstraction is not fully implemented.
+- Worker routes use a provider chain behind the stable `/api/apex/*` controller surface.
+- Tracker is primary, Mozambique / Apex Legends Status remains a placeholder fallback, and Mock is the failsafe.
+- Tracker 401 and 403 responses must mark Tracker as `blocked`, then fall through to Mock preview data with `fallbackUsed: true`.
+- Tracker 502, timeout, TLS, and upstream failures must mark Tracker as `failed`, then fall through to Mock preview data with `fallbackUsed: true`.
+- Mock fallback hits should be visible in `providerChain` with `code: "FALLBACK_USED"` and no secret-bearing upstream payload.
+- Tracker 401, 403, 502, timeout, TLS, and upstream failures must preserve safe provider metadata and fall through to fallback preview data.
 - Future provider work must keep the controller-facing response shape stable.
 - Fallback providers must never require frontend secrets.
 - Mock Provider is a failsafe for UI continuity, not the preferred live source.
