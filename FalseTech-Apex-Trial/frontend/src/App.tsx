@@ -2,6 +2,8 @@
 import { SpotifyMusicPanel } from './components/SpotifyMusicPanel';
 import { useEffect, useReducer, useState } from 'react';
 
+const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? '').trim().replace(/\/+$/, '');
+
 type PlatformUi = 'steam' | 'xbl' | 'psn';
 type PlatformApi = 'origin' | 'xbl' | 'psn';
 type ProviderId = 'tracker' | 'mozambique' | 'mock';
@@ -475,6 +477,8 @@ class ApiRequestError extends Error {
 }
 
 function apiUrl(path: string): string {
+  const normalizedPath = path.startsWith('/') ? path : `/${path}`;
+  return API_BASE_URL ? `${API_BASE_URL}${normalizedPath}` : normalizedPath;
   const cleanPath = path.startsWith('/') ? path : `/${path}`;
   const configuredBase = import.meta.env.VITE_API_BASE_URL?.trim();
   const baseUrl = configuredBase || (import.meta.env.DEV ? '' : WORKER_API_BASE_URL);

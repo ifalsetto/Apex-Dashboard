@@ -28,6 +28,7 @@ dist
 Safe public frontend env values:
 
 ```text
+VITE_API_BASE_URL=
 VITE_AUTH0_DOMAIN=
 VITE_AUTH0_CLIENT_ID=
 VITE_AUTH0_REDIRECT_URI=
@@ -35,6 +36,9 @@ VITE_AUTH0_LOGOUT_URI=
 VITE_API_BASE_URL=
 ```
 
+Leave `VITE_API_BASE_URL` blank or unset for public beta Pages/custom-domain builds. Blank means the browser calls same-origin relative `/api/apex/*` paths. Set it only when a deployment intentionally needs a backend/proxy base URL; never set it to Tracker or any provider API.
+
+Auth0 values are public application identifiers only. Do not put Tracker keys, Worker secrets, API tokens, passwords, or provider API URLs in frontend env. Route `/api/*` at the hosting/proxy layer so the browser still calls relative `/api/apex/*` paths by default.
 Auth0 values are public application identifiers only. `VITE_API_BASE_URL` may point only to a backend/proxy base URL such as the public Cloudflare Worker. Leave it blank to use the built-in production Worker default. Do not put Tracker keys, Worker secrets, API tokens, passwords, or direct provider API URLs in frontend env.
 
 ## Backend deployment
