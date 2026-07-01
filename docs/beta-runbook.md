@@ -108,8 +108,8 @@ Remove local env too:
 - Do not commit `.env.local`.
 - Do not put Tracker/TRN API keys in the frontend.
 - Keep `TRN_API_KEY` only in Cloudflare Worker secrets or the local Worker backend env used for authorized backend testing.
-- Do not use a frontend API base URL env var. React must call relative `/api/apex/*` routes only, with local proxy/backend routing outside the browser bundle.
-- Safe frontend env values are `VITE_AUTH0_DOMAIN`, `VITE_AUTH0_CLIENT_ID`, `VITE_AUTH0_REDIRECT_URI`, and `VITE_AUTH0_LOGOUT_URI`.
+- `VITE_API_BASE_URL` is allowed only for a backend/proxy base URL such as the public Cloudflare Worker. Leave it blank for local dev so Vite uses relative `/api/apex/*` routes through the local proxy.
+- Safe frontend env values are `VITE_API_BASE_URL`, `VITE_AUTH0_DOMAIN`, `VITE_AUTH0_CLIENT_ID`, `VITE_AUTH0_REDIRECT_URI`, and `VITE_AUTH0_LOGOUT_URI`.
 - Never commit `.env`, `.env.local`, secrets, API keys, tokens, `node_modules`, `dist`, `build`, cache folders, `.wrangler`, `.vite`, logs, or archives.
 - Do not read Apex memory, inject into the game, hook anti-cheat, or bypass protections.
 - Use safe external telemetry only: public API data, process state, local system metrics, network checks, and user-owned logs.
@@ -122,6 +122,8 @@ React dashboard on localhost:5173
   -> Cloudflare Worker
   -> Tracker API
 ```
+
+Production static builds default to the public Cloudflare Worker backend unless `VITE_API_BASE_URL` is set to another safe backend/proxy base URL. Never set it to Tracker or any external provider API directly.
 
 ## Future Tracker OAuth Plan
 
