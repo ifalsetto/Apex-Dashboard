@@ -479,6 +479,11 @@ class ApiRequestError extends Error {
 function apiUrl(path: string): string {
   const normalizedPath = path.startsWith('/') ? path : `/${path}`;
   return API_BASE_URL ? `${API_BASE_URL}${normalizedPath}` : normalizedPath;
+  const cleanPath = path.startsWith('/') ? path : `/${path}`;
+  const configuredBase = import.meta.env.VITE_API_BASE_URL?.trim();
+  const baseUrl = configuredBase || (import.meta.env.DEV ? '' : WORKER_API_BASE_URL);
+
+  return baseUrl ? `${baseUrl.replace(/\/+$/, '')}${cleanPath}` : cleanPath;
 }
 
 async function fetchStandard<T>(url: string): Promise<StandardApiResponse<T>> {
