@@ -1,6 +1,8 @@
 ﻿import AuthPanel from "./AuthPanel";
 import { useEffect, useReducer, useState } from 'react';
 
+const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? '').trim().replace(/\/+$/, '');
+
 type PlatformUi = 'steam' | 'xbl' | 'psn';
 type PlatformApi = 'origin' | 'xbl' | 'psn';
 type ProviderId = 'tracker' | 'mozambique' | 'mock';
@@ -461,8 +463,13 @@ class ApiRequestError extends Error {
   }
 }
 
+function apiUrl(path: string): string {
+  const normalizedPath = path.startsWith('/') ? path : `/${path}`;
+  return API_BASE_URL ? `${API_BASE_URL}${normalizedPath}` : normalizedPath;
+}
+
 async function fetchStandard<T>(url: string): Promise<StandardApiResponse<T>> {
-  const response = await fetch(url, {
+  const response = await fetch(apiUrl(url), {
     method: 'GET',
     headers: {
       Accept: 'application/json'
